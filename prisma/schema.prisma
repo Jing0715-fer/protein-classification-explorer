@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 模式生物 / 代表生物
+model Organism {
+  id             Int      @id @default(autoincrement())
+  taxonId        Int      @unique
+  scientificName String
+  commonName     String
+  // 用于构建系统发育树，如 "Eukaryota>Metazoa>Chordata>Mammalia>Primates"
+  phyloPath      String
+  orderRank      Int      @default(0)
+  proteins       Protein[]
+}
+
+// 蛋白家族（层级编码：大类 "1"，家族 "1.1"）
+model Family {
+  id          Int       @id @default(autoincrement())
+  code        String    @unique
+  name        String
+  nameEn      String
+  description String?
+  proteins    Protein[]
+}
+
+// 蛋白条目（UniProtKB / Swiss-Prot 真实数据）
+model Protein {
+  id             Int      @id @default(autoincrement())
+  accession      String   @unique
+  entryName      String
+  reviewed       Boolean  @default(true)
+  proteinName    String
+  altNames       String?
+  geneName       String?
+  geneSynonyms   String?
+  organismId     Int
+  organism       Organism @relation(fields: [organismId], references: [id])
+  familyId       Int
+  family         Family   @relation(fields: [familyId], references: [id])
+  orthologGroup  String
+  length         Int
+  massKda        Float
+  functionText   String?
+  subcellular    String?
+  ptm            String?
+  keywords       String?
+  domains        String?
+  pdbCount       Int      @default(0)
+  sequence       String?
+  isRepresentative Boolean @default(false)
+
+  @@index([familyId])
+  @@index([orthologGroup])
+  @@index([organismId])
+}
