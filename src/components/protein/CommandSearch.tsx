@@ -107,7 +107,7 @@ export function CommandSearch({
                     }}
                     className="gap-2 text-xs"
                   >
-                    <FlaskConical className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                    <FlaskConical className="h-3.5 w-3.5 shrink-0 text-primary" />
                     <span className="shrink-0 font-mono font-semibold">{p.accession}</span>
                     <span className="min-w-0 flex-1 truncate">{p.proteinName}</span>
                     <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{p.geneName || p.entryName}</span>
@@ -164,7 +164,7 @@ export function CommandSearch({
                       }}
                       className="gap-2 text-xs"
                     >
-                      <Microscope className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                      <Microscope className="h-3.5 w-3.5 shrink-0 text-primary" />
                       <span className="font-medium">{o.commonName}</span>
                       <span className="truncate italic text-muted-foreground">{sciByTaxon.get(o.taxonId)}</span>
                       <span className="ml-auto shrink-0 rounded-full bg-muted px-1.5 text-[10px] tabular-nums text-muted-foreground">

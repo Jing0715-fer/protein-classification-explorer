@@ -92,6 +92,7 @@ export async function GET() {
       name,
       nameEn: f.nameEn && f.nameEn !== name ? f.nameEn : "",
       description: "",
+      kind: f.kind && f.kind.length > 0 ? f.kind : "",
       count,
       totalCount: 0,
       byOrganism: Object.fromEntries(byOrg),

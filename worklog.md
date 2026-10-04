@@ -129,3 +129,23 @@ Stage Summary:
 - 层级体系从"13 大类 116 人工家族"升级为"13 大类 → 605 超家族 → 8,213 叶子家族"（UniProt 官方链）
 - 核心验证：MFS 主要易化超家族(5.1) 全物种 627 条 / 拟南芥 158 条（=官方 reviewed 全量，旧版仅 4 条）；下含 39 个家族（糖转运 146/POT 77/有机阳离子 72...）；GLUT1(P11166) 完整四级链"通道与转运 → MFS → 糖转运家族 → Glucose transporter subfamily"
 - Agent Browser 全流程通过：四级树导航/面包屑跳转/拟南芥筛选/热图 Top12 跳转/GLUT4 组比较 7 物种出图/移动端 390px 无溢出/控制台零报错；VLM 视觉审查 4 张截图无布局问题
+
+---
+Task ID: 8
+Agent: Z.ai Code (main)
+Task: 分类层级再修正（SLC 超群手术 + 全站并列问题排查）+ UI 学术期刊风改版（应用户反馈"溶质载体应是大超家族，下面包含 MFS 等；检查其他家族类似问题；优化 UI 美观度避免 AI 味"）
+
+Work Log:
+- 摸底：SLC 蛋白 1,168 条散落在转运大类 40+ 个并列节点（MFS 627/mitochondrial carrier 256/APC/ZIP/SSF/CPA1...），旧兜底节点 5.72 "Solute carriers (SLC)" 仅 23 条误抓蛋白；另发现 5 处类似并列/分裂问题：MIP/aquaporin(84) 与 Aquaporins(1) 同义分裂、3.13 Small GTPases(79) 兜底与 small GTPase superfamily(609) 分裂、3.39 ARF family 是拟南芥生长素响应因子（误挂信号类）、8.1 Immunoglobulins(417) 与 8.3 IgSF(295) 分裂、组蛋白 H1/H2A/H2B/H3/H4 平列无父节点、双功能酶链 "In the N/C-terminal section; belongs to..." 解析污染（2.8 节点 51 条）
+- classify-hierarchy.ts 六项层级手术：① SLC 超群手术——按基因名/蛋白名识别 SLC 蛋白（slcInfo，含防假阳性：酵母 SLC1 脂酰转移酶排除），建 "溶质载体超群 (SLC)" level2 组节点 + 18 个超家族分支（MFS/APC/DAACS/NSS/SSF/CPA1/CaCA/CCC/SulP/SLC4/BASS/MCF/金属/磷酸盐/NST/核苷维生素/MATE/其他，IUPHAR 分类）+ SLC 家族叶子（SLC1-68/SLCO 编号表含中文别名），迁移 1,220 条；② GPCR 超家族分组——Class A/B/C/T2R/Fz-Smo 等 9 个并列节点收拢（1,926 条）；③ 组蛋白家族组——H1/H2A/H2B/H3/H4 收拢（247 条）；④ IgSF 合并——Immunoglobulins 兜底收归 immunoglobulin superfamily 下；⑤ 生长素 ARF 迁移——23 条拟南芥转录因子 3→4 类；⑥ 小 G 蛋白兜底分流——34 条按基因名 RAB/RAS/RHO/ARF/RAN 归入 small GTPase superfamily 对应家族
+- parseChain 修复：清理 "In the N/C-terminal section; belongs to the" 双功能酶前缀；CANON_SYNONYMS 同义归一（aquaporins/MIP/aquaporin family 合并）
+- kind 字段贯通：TreeNode.kind → hier-families.json → Prisma Family.kind → bootstrap DTO → 前端（group=超群/surgery=手术分支）
+- 重跑管线：5.6s 分类 + 0.2min 入库（8,812 家族节点：13 大类 + 8,799 层级），db:push 加 kind 列
+- UI 学术期刊风改版（去 AI 味）：Fraunces 衬线标题 + IBM Plex Mono 等宽数据 + Instrument Sans UI 字体（next/font）；暖纸/暖墨双色主题（浅 #FAF8F2 / 深 #171511，主色深松绿 #2F5D46）；CLASS_COLORS 重配 13 色自然学术色板（去 violet/cyan/fuchsia 蓝紫系）；页头重做为期刊式（overline 小标签 + 大衬线标题 + 元数据行）；StatsBar 从 8 卡片改为数字编辑条（细竖线分隔无卡片无图标）；导航改下划线式 tabs；FamilyTree 加超群菱形标记/「超群」徽标/缩进参考线/serif 节点名；表格学术表头（uppercase tracking + 双线边框）；全站 emerald 硬编码替换为 primary token；细窄滚动条 + selection 色 + data-table utility
+- 验证：lint 零错误 / tsc src 零错误 / Turbopack 缓存损坏一次（删 .next 重启）；Agent Browser 全链路：SLC 树四级导航（通道与转运→溶质载体超群→MFS 主要易化超家族→SLC2A·GLUT）→ 面包屑 → GLUT1(P11166) 详情家族链完整显示 → 进化视角热图含 SLC → ⌘K 搜索 → 暗色模式 → 移动端 390px 无横向溢出；VLM 视觉审查 5 轮（"专业感强，非 AI 模板风"）
+
+Stage Summary:
+- 层级修正核心成果：溶质载体超群 (SLC) total=1,220，下设 18 个超家族分支、62 个 SLC 家族；MFS 分支 317 条含 18 家族（SLC22A 56/SLC16A 44/SLC2A·GLUT 39/SLCO·OATP 37...）；跨物种 MFS 超家族保留 398 条（植物/酵母/细菌）
+- GPCR 超家族 1,926 条收拢 9 子类；组蛋白/IgSF/ARF/小G蛋白/水通道同义合并全部完成
+- UI 从 shadcn 默认风升级为学术期刊风（暖纸配色+衬线标题+等宽数据+细线分隔），VLM 评价"专业感强，非 AI 模板风"
+- 数据规模不变：87,728 蛋白 / 10 物种 / 13 大类 / 574 超家族 / 8,119 叶子家族 / 10,501 直系同源组 / classifiedPct 93.5%

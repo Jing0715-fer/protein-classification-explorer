@@ -26,6 +26,8 @@ model Family {
   name        String
   nameEn      String
   description String?
+  /** 手术组节点标记：group=超群（SLC/GPCR/组蛋白等人工组层），surgery=手术分支 */
+  kind        String?
   proteins    Protein[]
 }
 

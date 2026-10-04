@@ -103,7 +103,7 @@ async function main() {
   // 4) 家族层级节点（大类 + 超家族/家族/亚家族，编码即层级）
   const famDefs = (await Bun.file("download/hier-families.json").json()) as {
     classes: { code: string; name: string; nameEn: string; description: string }[];
-    families: { code: string; name: string; nameEn: string; description: string }[];
+    families: { code: string; name: string; nameEn: string; description: string; kind?: string }[];
   };
   await db.family.createMany({
     data: [
@@ -118,6 +118,7 @@ async function main() {
         name: f.name,
         nameEn: f.nameEn,
         description: f.description ?? "",
+        kind: f.kind && f.kind.length > 0 ? f.kind : null,
       })),
     ],
   });

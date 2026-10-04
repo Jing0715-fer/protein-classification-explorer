@@ -210,7 +210,7 @@ export function PhyloView({ ctx }: { ctx: ExplorerCtx }) {
       <section className="rounded-xl border bg-card" aria-label="物种系统发生树">
         <div className="border-b px-4 py-3">
           <h2 className="flex items-center gap-1.5 text-sm font-semibold">
-            <TreePine className="h-4 w-4 text-emerald-600" />
+            <TreePine className="h-4 w-4 text-primary" />
             物种系统发生树
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -262,7 +262,7 @@ export function PhyloView({ ctx }: { ctx: ExplorerCtx }) {
         <div className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-3">
           <div className="max-w-xl">
             <h2 className="flex items-center gap-1.5 text-sm font-semibold">
-              <Grid3x3 className="h-4 w-4 text-emerald-600" />
+              <Grid3x3 className="h-4 w-4 text-primary" />
               超家族 × 物种覆盖热图
             </h2>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
@@ -273,11 +273,11 @@ export function PhyloView({ ctx }: { ctx: ExplorerCtx }) {
           <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
             <span>浅</span>
             <span className="flex h-3 w-24 overflow-hidden rounded-full border" aria-hidden>
-              <span className="h-full flex-1 bg-emerald-600/15" />
-              <span className="h-full flex-1 bg-emerald-600/35" />
-              <span className="h-full flex-1 bg-emerald-600/60" />
-              <span className="h-full flex-1 bg-emerald-600/85" />
-              <span className="h-full flex-1 bg-emerald-600" />
+              <span className="h-full flex-1 bg-primary/15" />
+              <span className="h-full flex-1 bg-primary/35" />
+              <span className="h-full flex-1 bg-primary/60" />
+              <span className="h-full flex-1 bg-primary/85" />
+              <span className="h-full flex-1 bg-primary" />
             </span>
             <span>深</span>
             <span className="ml-1 rounded border border-dashed px-1 py-0.5">0 = 空</span>
@@ -369,7 +369,7 @@ export function PhyloView({ ctx }: { ctx: ExplorerCtx }) {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="max-w-xl">
               <h2 className="flex items-center gap-1.5 text-sm font-semibold">
-                <Users className="h-4 w-4 text-emerald-600" />
+                <Users className="h-4 w-4 text-primary" />
                 直系同源组浏览
                 <Badge variant="secondary" className="ml-1 font-normal tabular-nums">
                   {groups ? `${groups.total.toLocaleString()} 组` : "…"}
@@ -617,9 +617,9 @@ export function PhyloView({ ctx }: { ctx: ExplorerCtx }) {
                   setDialogGroup(null);
                   openDetail(p.accession);
                 }}
-                className="flex w-full items-center gap-2.5 rounded-lg border bg-card px-3 py-2 text-left text-xs transition-colors hover:border-emerald-400 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/30"
+                className="flex w-full items-center gap-2.5 rounded-lg border bg-card px-3 py-2 text-left text-xs transition-colors hover:border-emerald-400 hover:bg-primary/10/50 dark:hover:bg-emerald-950/30"
               >
-                <span className="shrink-0 font-mono font-semibold text-emerald-700 dark:text-emerald-400">{p.accession}</span>
+                <span className="shrink-0 font-mono font-semibold text-primary">{p.accession}</span>
                 <span className="min-w-0 flex-1 truncate" title={p.proteinName}>
                   {p.geneName && <span className="font-medium">{p.geneName} · </span>}
                   {p.proteinName}
@@ -639,7 +639,7 @@ export function PhyloView({ ctx }: { ctx: ExplorerCtx }) {
             <p className="text-[10px] text-muted-foreground">每物种选取长度中位数代表，去重后 ≤12 个</p>
             <Button
               size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-primary hover:bg-primary/90"
               disabled={!members || members.rows.length < 2}
               onClick={compareThisGroup}
             >

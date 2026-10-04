@@ -225,7 +225,7 @@ export function CompareView({ ctx }: { ctx: ExplorerCtx }) {
             <Popover open={groupOpen} onOpenChange={setGroupOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="h-8 max-w-[320px] gap-2 font-medium">
-                  <span className="truncate text-emerald-600">{selectedGroup?.name ?? "搜索并选择同源组"}</span>
+                  <span className="truncate text-primary">{selectedGroup?.name ?? "搜索并选择同源组"}</span>
                   <ChevronDown className="h-3.5 w-3.5 shrink-0" />
                 </Button>
               </PopoverTrigger>
@@ -344,7 +344,7 @@ export function CompareView({ ctx }: { ctx: ExplorerCtx }) {
                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: ORG_COLORS[p.taxonId] ?? "#64748b" }} />
                   <span className="truncate text-xs font-semibold">{ORG_SHORT[p.taxonId] ?? p.organismCommon}</span>
                 </div>
-                <div className="mt-1 truncate font-mono text-sm font-bold text-emerald-700 dark:text-emerald-400">{p.accession}</div>
+                <div className="mt-1 truncate font-mono text-sm font-bold text-primary">{p.accession}</div>
                 <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{p.geneName || p.entryName}</div>
                 <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground tabular-nums">
                   <span>{p.length.toLocaleString()} aa</span>
@@ -365,7 +365,7 @@ export function CompareView({ ctx }: { ctx: ExplorerCtx }) {
             ].map((it) => (
               <div key={it.label} className="rounded-xl border bg-card p-3">
                 <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <it.icon className="h-3.5 w-3.5 text-emerald-600" />
+                  <it.icon className="h-3.5 w-3.5 text-primary" />
                   <span className="text-[11px] font-medium">{it.label}</span>
                 </div>
                 <div className="mt-1 text-lg font-bold tabular-nums">{it.value}</div>
@@ -548,7 +548,7 @@ export function CompareView({ ctx }: { ctx: ExplorerCtx }) {
                     key={`${pair.a}|${pair.b}`}
                     onClick={() => setPairSel(pairSel === pair ? null : pair)}
                     className={`w-full rounded-lg border px-3 py-2 text-left transition-colors hover:border-emerald-400/60 ${
-                      pairSel === pair ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/30" : "bg-muted/20"
+                      pairSel === pair ? "border-emerald-500 bg-primary/10/50 dark:bg-primary/10/30" : "bg-muted/20"
                     }`}
                   >
                     <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -642,7 +642,7 @@ export function CompareView({ ctx }: { ctx: ExplorerCtx }) {
                     className="cursor-pointer border-b border-border/50 hover:bg-accent/50"
                     onClick={() => openDetail(p.accession)}
                   >
-                    <td className="px-3 py-2 font-mono font-semibold text-emerald-700 dark:text-emerald-400">{p.accession}</td>
+                    <td className="px-3 py-2 font-mono font-semibold text-primary">{p.accession}</td>
                     <td className="max-w-[260px] truncate px-3 py-2" title={p.proteinName}>
                       {p.proteinName}
                     </td>

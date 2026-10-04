@@ -15,6 +15,8 @@ export interface FamilyNodeDTO {
   name: string;
   nameEn: string;
   description: string;
+  /** 组节点标记：group=超群（SLC/GPCR/组蛋白），surgery=手术分支 */
+  kind?: string;
   /** 直接挂载的蛋白数（二级家族） */
   count: number;
   /** 含子节点的蛋白数（大类） */
@@ -212,21 +214,21 @@ export interface SearchResultDTO {
   organisms: { taxonId: number; commonName: string; proteinCount: number }[];
 }
 
-/** 13 个大类的配色（用于树/矩阵/图例） */
+/** 13 个大类的配色（自然学术色板，用于树/矩阵/图例） */
 export const CLASS_COLORS: Record<string, string> = {
-  "1": "#059669", // 酶类 - emerald
-  "2": "#65a30d", // 激酶 - lime
-  "3": "#0d9488", // 受体与信号 - teal
-  "4": "#e11d48", // 转录与染色质 - rose
-  "5": "#d97706", // 通道与转运 - amber
-  "6": "#ea580c", // 细胞骨架 - orange
-  "7": "#ca8a04", // ECM与分泌 - yellow
-  "8": "#dc2626", // 免疫防御 - red
-  "9": "#7c3aed", // 核糖体与翻译 - violet
-  "10": "#0891b2", // 蛋白质稳态 - cyan
-  "11": "#db2777", // 周期与肿瘤 - pink
-  "12": "#c026d3", // 核酸加工 - fuchsia
-  "13": "#78716c", // 膜与其他 - stone
+  "1": "#6e8b3d", // 酶类 - 橄榄绿
+  "2": "#c9a227", // 激酶 - 芥末金
+  "3": "#2e7d64", // 受体与信号 - 松绿
+  "4": "#b5496a", // 转录与染色质 - 绯梅
+  "5": "#c0762f", // 通道与转运 - 琥珀赭
+  "6": "#a35a3c", // 细胞骨架 - 赭红
+  "7": "#8a7b52", // ECM与分泌 - 黄褐
+  "8": "#ab3b30", // 免疫防御 - 砖红
+  "9": "#7c8a70", // 核糖体与翻译 - 灰绿
+  "10": "#3d7a78", // 蛋白质稳态 - 深青
+  "11": "#b8638f", // 周期与肿瘤 - 梅粉
+  "12": "#96637e", // 核酸加工 - 灰梅
+  "13": "#8b857a", // 膜与其他 - 暖灰
 };
 
 export const CLASS_NAMES: Record<string, string> = {

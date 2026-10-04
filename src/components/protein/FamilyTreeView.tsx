@@ -129,9 +129,9 @@ export function FamilyTreeView({ ctx }: { ctx: ExplorerCtx }) {
   const sortIcon = (field: Exclude<SortField, "default">) =>
     sort === field ? (
       dir === "asc" ? (
-        <ArrowUp className="h-3 w-3 text-emerald-600" />
+        <ArrowUp className="h-3 w-3 text-primary" />
       ) : (
-        <ArrowDown className="h-3 w-3 text-emerald-600" />
+        <ArrowDown className="h-3 w-3 text-primary" />
       )
     ) : null;
 
@@ -196,7 +196,7 @@ export function FamilyTreeView({ ctx }: { ctx: ExplorerCtx }) {
             />
           </td>
           <td className="whitespace-nowrap px-2.5 py-1.5">
-            <span className="font-mono font-semibold text-emerald-700 dark:text-emerald-400">{p.accession}</span>
+            <span className="font-mono font-semibold text-primary">{p.accession}</span>
           </td>
           <td className="max-w-[260px] truncate px-2.5 py-1.5" title={p.proteinName}>
             {p.proteinName}
@@ -217,7 +217,7 @@ export function FamilyTreeView({ ctx }: { ctx: ExplorerCtx }) {
           <td className="px-2.5 py-1.5 text-right tabular-nums">{p.massKda.toLocaleString()}</td>
           <td className="px-2.5 py-1.5 text-right">
             {p.hasEC ? (
-              <Badge variant="outline" className="border-amber-300 bg-amber-50 px-1 py-0 text-[9px] font-semibold text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400" title="含酶学委员会编号 EC">
+              <Badge variant="outline" className="border-primary/40 bg-primary/5 px-1 py-0 font-mono text-[9px] font-semibold text-primary" title="含酶学委员会编号 EC">
                 EC
               </Badge>
             ) : (
@@ -232,11 +232,11 @@ export function FamilyTreeView({ ctx }: { ctx: ExplorerCtx }) {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[290px_1fr]">
       {/* 左侧：分类树 */}
-      <div className="rounded-xl border bg-card">
-        <div className="flex items-center justify-between border-b px-3 py-2.5">
-          <h2 className="text-sm font-semibold">蛋白家族分类体系</h2>
-          <span className="text-[10px] text-muted-foreground" title="大类 → 超家族 → 家族 → 亚家族（UniProt 官方层级链）">
-            {data.stats.superfamilyCount.toLocaleString()} 超家族 · {data.stats.familyCount.toLocaleString()} 叶子家族
+      <div className="border border-border bg-card">
+        <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
+          <h2 className="overline-label !text-foreground">分类体系</h2>
+          <span className="font-mono text-[10px] text-muted-foreground" title="大类 → 超群/超家族 → 家族 → 亚家族（UniProt 官方层级链）">
+            {data.stats.superfamilyCount.toLocaleString()} SF · {data.stats.familyCount.toLocaleString()} FAM
           </span>
         </div>
         <ScrollArea className={`h-[540px] px-2 py-2 ${SCROLLBAR_CLS}`}>
@@ -246,7 +246,7 @@ export function FamilyTreeView({ ctx }: { ctx: ExplorerCtx }) {
             onSelect={(c) => setFamilyCode(c === familyCode ? null : c)}
           />
         </ScrollArea>
-        <div className="flex flex-wrap gap-x-3 gap-y-1 border-t px-3 py-2">
+        <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-border px-3 py-2">
           {data.families.map((c) => (
             <span key={c.code} className="flex items-center gap-1 text-[10px] text-muted-foreground">
               <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: CLASS_COLORS[c.code] }} />
@@ -257,10 +257,10 @@ export function FamilyTreeView({ ctx }: { ctx: ExplorerCtx }) {
       </div>
 
       {/* 右侧：蛋白列表（服务端分页） */}
-      <div className="min-w-0 rounded-xl border bg-card">
-        <div className="flex flex-col gap-3 border-b px-3 py-2.5 sm:px-4">
+      <div className="min-w-0 border border-border bg-card">
+        <div className="flex flex-col gap-3 border-b border-border px-3 py-2.5 sm:px-4">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-sm font-semibold">
+            <h2 className="font-serif text-[15px] font-semibold tracking-tight">
               {familyPath && familyPath.length > 0 ? (
                 <span className="inline-flex flex-wrap items-center gap-x-1">
                   {familyPath.map((n, i) => (
@@ -285,10 +285,10 @@ export function FamilyTreeView({ ctx }: { ctx: ExplorerCtx }) {
                 "全部蛋白"
               )}
             </h2>
-            <Badge variant="secondary" className="tabular-nums">
+            <Badge variant="secondary" className="font-mono tabular-nums">
               {list ? `${list.total.toLocaleString()} 条` : "…"}
             </Badge>
-            {isFetching && <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-600" />}
+            {isFetching && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />}
             {hasFilter && (
               <Button
                 variant="ghost"
@@ -329,10 +329,10 @@ export function FamilyTreeView({ ctx }: { ctx: ExplorerCtx }) {
           {/* 物种筛选 chips */}
           <div className={`flex flex-wrap items-center gap-1.5 pb-0.5 ${SCROLLBAR_CLS}`}>
             <button
-              className={`h-11 shrink-0 rounded-full border px-2.5 text-[11px] font-medium transition-colors sm:h-7 ${
+              className={`h-11 shrink-0 border px-2.5 text-[11px] font-medium transition-colors sm:h-7 ${
                 taxonFilter === null
-                  ? "border-emerald-600 bg-emerald-600 text-white"
-                  : "bg-background text-muted-foreground hover:border-foreground/30"
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-background text-muted-foreground hover:border-foreground/30"
               }`}
               onClick={() => setTaxonFilter(null)}
             >
@@ -346,8 +346,8 @@ export function FamilyTreeView({ ctx }: { ctx: ExplorerCtx }) {
                   key={o.taxonId}
                   disabled={n === 0}
                   title={`${o.commonName} · ${o.scientificName}：${n.toLocaleString()} 条`}
-                  className={`flex h-11 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-[11px] transition-colors disabled:opacity-35 sm:h-7 ${
-                    active ? "border-emerald-600 bg-emerald-600 text-white" : "bg-background text-muted-foreground hover:border-foreground/30"
+                  className={`flex h-11 shrink-0 items-center gap-1.5 border px-2.5 text-[11px] transition-colors disabled:opacity-35 sm:h-7 ${
+                    active ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground hover:border-foreground/30"
                   }`}
                   onClick={() => setTaxonFilter(active ? null : o.taxonId)}
                 >
@@ -362,11 +362,11 @@ export function FamilyTreeView({ ctx }: { ctx: ExplorerCtx }) {
           </div>
         </div>
 
-        {/* 蛋白表格（服务端分页） */}
+        {/* 蛋白表格（服务端分页）：学术表头，上框线加重 */}
         <div ref={tableRef} className={`max-h-[560px] overflow-auto ${SCROLLBAR_CLS}`}>
-          <table className="w-full min-w-[820px] border-collapse text-left text-xs">
-            <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
-              <tr className="[&>th]:border-b [&>th]:px-2.5 [&>th]:py-2 [&>th]:font-medium [&>th]:text-muted-foreground">
+          <table className="data-table w-full min-w-[820px] border-collapse text-left text-xs">
+            <thead className="sticky top-0 z-10 bg-card">
+              <tr className="[&>th]:border-b-2 [&>th]:border-border [&>th]:px-2.5 [&>th]:py-2.5">
                 <th className="w-8" aria-label="加入比较" />
                 <th>
                   <button className="flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort("accession")}>
@@ -436,10 +436,10 @@ export function FamilyTreeView({ ctx }: { ctx: ExplorerCtx }) {
                 <button
                   key={p}
                   onClick={() => gotoPage(p)}
-                  className={`h-11 min-w-11 rounded-md px-1.5 text-[11px] tabular-nums transition-colors sm:h-7 sm:min-w-7 ${
+                  className={`h-11 min-w-11 border px-1.5 font-mono text-[11px] tabular-nums transition-colors sm:h-7 sm:min-w-7 ${
                     p === page
-                      ? "bg-emerald-600 font-semibold text-white"
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                      ? "border-primary bg-primary font-semibold text-primary-foreground"
+                      : "border-transparent text-muted-foreground hover:bg-accent hover:text-foreground"
                   }`}
                 >
                   {p}

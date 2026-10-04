@@ -6,8 +6,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-ui), ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-serif: var(--font-display), Georgia, "Times New Roman", "Songti SC", "Noto Serif SC", serif;
+  --font-mono: var(--font-data), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -37,79 +38,85 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
 }
 
+/*
+ * 设计语言：学术期刊 / 博物志
+ * 暖纸底 + 深松绿主色 + 赭金点缀；细线分隔；衬线标题 + 等宽数据
+ */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --radius: 0.375rem;
+  /* 暖纸浅色 */
+  --background: #faf8f2;
+  --foreground: #262119;
+  --card: #fffefb;
+  --card-foreground: #262119;
+  --popover: #fffefb;
+  --popover-foreground: #262119;
+  --primary: #2f5d46;
+  --primary-foreground: #f6f4ec;
+  --secondary: #eee9dc;
+  --secondary-foreground: #3d3a2e;
+  --muted: #f0ece1;
+  --muted-foreground: #79715e;
+  --accent: #e9e2cf;
+  --accent-foreground: #33291a;
+  --destructive: #a4372c;
+  --border: #e2dcc9;
+  --input: #d8d1bc;
+  --ring: #2f5d46;
+  --chart-1: #6e8b3d;
+  --chart-2: #c9a227;
+  --chart-3: #2e7d64;
+  --chart-4: #b5496a;
+  --chart-5: #c0762f;
+  --sidebar: #fffefb;
+  --sidebar-foreground: #262119;
+  --sidebar-primary: #2f5d46;
+  --sidebar-primary-foreground: #f6f4ec;
+  --sidebar-accent: #eee9dc;
+  --sidebar-accent-foreground: #3d3a2e;
+  --sidebar-border: #e2dcc9;
+  --sidebar-ring: #2f5d46;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* 暖墨深色 */
+  --background: #171511;
+  --foreground: #e9e3d4;
+  --card: #1e1b16;
+  --card-foreground: #e9e3d4;
+  --popover: #1e1b16;
+  --popover-foreground: #e9e3d4;
+  --primary: #85b298;
+  --primary-foreground: #14231b;
+  --secondary: #2a261f;
+  --secondary-foreground: #d6cfbd;
+  --muted: #24211b;
+  --muted-foreground: #9c927c;
+  --accent: #2e2a21;
+  --accent-foreground: #e0d9c6;
+  --destructive: #c96a5c;
+  --border: #322d24;
+  --input: #3a342a;
+  --ring: #85b298;
+  --chart-1: #8fa75a;
+  --chart-2: #d4b04e;
+  --chart-3: #5aa085;
+  --chart-4: #cf7391;
+  --chart-5: #d2924e;
+  --sidebar: #1e1b16;
+  --sidebar-foreground: #e9e3d4;
+  --sidebar-primary: #85b298;
+  --sidebar-primary-foreground: #14231b;
+  --sidebar-accent: #2a261f;
+  --sidebar-accent-foreground: #d6cfbd;
+  --sidebar-border: #322d24;
+  --sidebar-ring: #85b298;
 }
 
 @layer base {
@@ -118,5 +125,41 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "ss01", "cv05";
   }
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 24%, transparent);
+  }
+}
+
+@layer utilities {
+  /* 期刊式 overline 小标签 */
+  .overline-label {
+    @apply text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground;
+  }
+  .hairline-t {
+    border-top: 1px solid var(--border);
+  }
+}
+
+/* 细窄滚动条（数据区） */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--input) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--input);
+  border-radius: 3px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 学术表格：紧凑数字对齐 */
+.data-table th {
+  @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground;
 }

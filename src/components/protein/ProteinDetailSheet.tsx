@@ -93,7 +93,7 @@ function TextBlock({ text }: { text: string }) {
       )}
       {long && (
         <button
-          className="mt-1 text-[11px] font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+          className="mt-1 text-[11px] font-medium text-primary hover:underline dark:text-primary"
           onClick={() => setExpanded((v) => !v)}
         >
           {expanded ? "收起" : `展开全文（${text.length.toLocaleString()} 字符）`}
@@ -256,11 +256,11 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
                   href={`https://www.uniprot.org/uniprotkb/${detail.accession}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="font-mono text-lg tracking-tight text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400"
+                  className="font-mono text-lg tracking-tight text-primary underline-offset-2 hover:underline dark:text-primary"
                 >
                   {detail.accession}
                 </a>
-                <Badge variant="outline" className="gap-1 border-emerald-200 bg-emerald-50 text-[10px] font-medium text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-400">
+                <Badge variant="outline" className="gap-1 border-primary/25 bg-primary/10 text-[10px] font-medium text-primary dark:border-emerald-900 dark:bg-primary/10 dark:text-primary">
                   <BadgeCheck className="h-3 w-3" /> {detail.entryType?.includes("reviewed") ? "Swiss-Prot" : detail.entryType || "UniProtKB"}
                 </Badge>
                 <Badge
@@ -372,7 +372,7 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
               {/* PDB chips */}
               {detail.pdbIds.length > 0 && (
                 <div>
-                  <SectionTitle icon={<Boxes className="h-4 w-4 text-emerald-600" />} title="PDB 结构" sub={`前 ${Math.min(12, detail.pdbIds.length)} / ${detail.pdbCount} 个 · RCSB 外链`} />
+                  <SectionTitle icon={<Boxes className="h-4 w-4 text-primary" />} title="PDB 结构" sub={`前 ${Math.min(12, detail.pdbIds.length)} / ${detail.pdbCount} 个 · RCSB 外链`} />
                   <div className="flex flex-wrap gap-1.5">
                     {detail.pdbIds.slice(0, 12).map((id) => (
                       <a
@@ -380,7 +380,7 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
                         href={`https://www.rcsb.org/structure/${id}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="rounded-full border bg-card px-2.5 py-1 font-mono text-[11px] transition-colors hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-400"
+                        className="rounded-full border bg-card px-2.5 py-1 font-mono text-[11px] transition-colors hover:border-emerald-400 hover:bg-primary/10 hover:text-primary dark:hover:bg-primary/10 dark:hover:text-primary"
                       >
                         {id}
                       </a>
@@ -404,43 +404,43 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
               {/* 文本注释区 */}
               {detail.functionText && (
                 <div>
-                  <SectionTitle icon={<Info className="h-4 w-4 text-emerald-600" />} title="功能" sub="Function · UniProt 注释" />
+                  <SectionTitle icon={<Info className="h-4 w-4 text-primary" />} title="功能" sub="Function · UniProt 注释" />
                   <TextBlock text={detail.functionText} />
                 </div>
               )}
               {detail.catalyticActivity && (
                 <div>
-                  <SectionTitle icon={<FlaskConical className="h-4 w-4 text-emerald-600" />} title="催化活性" sub="Catalytic activity" />
+                  <SectionTitle icon={<FlaskConical className="h-4 w-4 text-primary" />} title="催化活性" sub="Catalytic activity" />
                   <TextBlock text={detail.catalyticActivity} />
                 </div>
               )}
               {detail.subunit && (
                 <div>
-                  <SectionTitle icon={<Users className="h-4 w-4 text-emerald-600" />} title="亚基结构" sub="Subunit structure" />
+                  <SectionTitle icon={<Users className="h-4 w-4 text-primary" />} title="亚基结构" sub="Subunit structure" />
                   <TextBlock text={detail.subunit} />
                 </div>
               )}
               {detail.tissueSpecificity && (
                 <div>
-                  <SectionTitle icon={<Microscope className="h-4 w-4 text-emerald-600" />} title="组织特异性" sub="Tissue specificity" />
+                  <SectionTitle icon={<Microscope className="h-4 w-4 text-primary" />} title="组织特异性" sub="Tissue specificity" />
                   <TextBlock text={detail.tissueSpecificity} />
                 </div>
               )}
               {detail.induction && (
                 <div>
-                  <SectionTitle icon={<Sparkles className="h-4 w-4 text-emerald-600" />} title="诱导表达" sub="Induction" />
+                  <SectionTitle icon={<Sparkles className="h-4 w-4 text-primary" />} title="诱导表达" sub="Induction" />
                   <TextBlock text={detail.induction} />
                 </div>
               )}
               {detail.ptm && (
                 <div>
-                  <SectionTitle icon={<Waves className="h-4 w-4 text-emerald-600" />} title="翻译后修饰" sub="PTM / Processing" />
+                  <SectionTitle icon={<Waves className="h-4 w-4 text-primary" />} title="翻译后修饰" sub="PTM / Processing" />
                   <TextBlock text={detail.ptm} />
                 </div>
               )}
               {detail.similarity && (
                 <div>
-                  <SectionTitle icon={<GitCompare className="h-4 w-4 text-emerald-600" />} title="序列相似性" sub="Similarity" />
+                  <SectionTitle icon={<GitCompare className="h-4 w-4 text-primary" />} title="序列相似性" sub="Similarity" />
                   <TextBlock text={detail.similarity} />
                 </div>
               )}
@@ -448,7 +448,7 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
               {/* 亚细胞定位 */}
               {detail.subcellular.length > 0 && (
                 <div>
-                  <SectionTitle icon={<MapPin className="h-4 w-4 text-emerald-600" />} title="亚细胞定位" />
+                  <SectionTitle icon={<MapPin className="h-4 w-4 text-primary" />} title="亚细胞定位" />
                   <div className="flex flex-wrap gap-1">
                     {detail.subcellular.map((s) => (
                       <Badge key={s} variant="secondary" className="text-[11px] font-normal">
@@ -462,7 +462,7 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
               {/* 结构域 + 位置条 */}
               {detail.domains.length > 0 && (
                 <div>
-                  <SectionTitle icon={<Boxes className="h-4 w-4 text-emerald-600" />} title="结构域" sub="Pfam / UniProt 注释" />
+                  <SectionTitle icon={<Boxes className="h-4 w-4 text-primary" />} title="结构域" sub="Pfam / UniProt 注释" />
                   <div className="flex flex-wrap gap-1">
                     {detail.domains.map((d) => (
                       <Badge key={d} variant="outline" className="border-border/80 text-[11px] font-normal">
@@ -477,7 +477,7 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
               )}
               {detail.domains.length === 0 && detail.domainFeatures.length > 0 && (
                 <div>
-                  <SectionTitle icon={<Boxes className="h-4 w-4 text-emerald-600" />} title="序列特征区" sub={`${detail.domainFeatures.length} 个特征`} />
+                  <SectionTitle icon={<Boxes className="h-4 w-4 text-primary" />} title="序列特征区" sub={`${detail.domainFeatures.length} 个特征`} />
                   <DomainBar features={detail.domainFeatures} length={detail.length} />
                 </div>
               )}
@@ -485,7 +485,7 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
               {/* GO 词条 */}
               {goGroups && goGroups.length > 0 && (
                 <div>
-                  <SectionTitle icon={<Sparkles className="h-4 w-4 text-emerald-600" />} title="Gene Ontology" sub={`${detail.goTerms.length} 条注释`} />
+                  <SectionTitle icon={<Sparkles className="h-4 w-4 text-primary" />} title="Gene Ontology" sub={`${detail.goTerms.length} 条注释`} />
                   <div className="space-y-2">
                     {goGroups.map((g) => (
                       <div key={g.aspect}>
@@ -517,7 +517,7 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
               {/* 关键词 */}
               {detail.keywords.length > 0 && (
                 <div>
-                  <SectionTitle icon={<Sparkles className="h-4 w-4 text-emerald-600" />} title="关键词" sub="UniProt Keywords · 悬停查看分类" />
+                  <SectionTitle icon={<Sparkles className="h-4 w-4 text-primary" />} title="关键词" sub="UniProt Keywords · 悬停查看分类" />
                   <div className="flex flex-wrap gap-1">
                     {detail.keywords.map((k) => (
                       <Badge key={k.id} variant="outline" className="border-border/80 text-[11px] font-normal" title={k.category}>
@@ -531,7 +531,7 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
               {/* 氨基酸组成 */}
               {compData.length > 0 && (
                 <div>
-                  <SectionTitle icon={<FlaskConical className="h-4 w-4 text-emerald-600" />} title="氨基酸组成" sub="mol %" />
+                  <SectionTitle icon={<FlaskConical className="h-4 w-4 text-primary" />} title="氨基酸组成" sub="mol %" />
                   <div className="h-32">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={compData} margin={{ top: 4, right: 4, left: -22, bottom: 0 }}>
@@ -559,12 +559,12 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
               <div>
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <h3 className="flex items-center gap-1.5 text-sm font-semibold">
-                    <GitCompare className="h-4 w-4 text-emerald-600" />
+                    <GitCompare className="h-4 w-4 text-primary" />
                     直系同源
                     <span className="text-xs font-normal text-muted-foreground">（{detail.orthologs.length} 个其他成员）</span>
                   </h3>
                   {detail.orthologs.length > 0 && (
-                    <Button size="sm" variant="outline" className="ml-auto h-7 gap-1.5 border-emerald-600/40 text-[11px] text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-950/40" onClick={addOrthologsToCompare}>
+                    <Button size="sm" variant="outline" className="ml-auto h-7 gap-1.5 border-primary/40 text-[11px] text-primary hover:bg-primary/10 dark:text-primary dark:hover:bg-primary/10" onClick={addOrthologsToCompare}>
                       <GitCompare className="h-3 w-3" />
                       全部加入比较（≤12）
                     </Button>
@@ -590,7 +590,7 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
                             onClick={() => openDetail(o.accession)}
                             title={`${o.proteinName} · ${o.organismScientific}`}
                           >
-                            <td className="px-2.5 py-1.5 font-mono font-semibold text-emerald-700 dark:text-emerald-400">{o.accession}</td>
+                            <td className="px-2.5 py-1.5 font-mono font-semibold text-primary">{o.accession}</td>
                             <td className="whitespace-nowrap px-2.5 py-1.5 font-mono text-[11px]">{o.geneName || "—"}</td>
                             <td className="hidden max-w-[220px] truncate px-2.5 py-1.5 text-muted-foreground sm:table-cell">{o.proteinName}</td>
                             <td className="whitespace-nowrap px-2.5 py-1.5">
@@ -613,7 +613,7 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
                 <div>
                   <div className="flex items-center gap-2">
                     <button className="flex items-center gap-1.5 text-sm font-semibold" onClick={() => setShowSeq((v) => !v)}>
-                      <span className="text-emerald-600">{showSeq ? "▾" : "▸"}</span> 氨基酸序列
+                      <span className="text-primary">{showSeq ? "▾" : "▸"}</span> 氨基酸序列
                       <span className="text-xs font-normal text-muted-foreground">（{detail.length.toLocaleString()} aa · 点击{showSeq ? "折叠" : "展开"}）</span>
                     </button>
                     <Button
@@ -623,7 +623,7 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
                       onClick={copySequence}
                       aria-label="复制序列"
                     >
-                      {copied ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
+                      {copied ? <Check className="h-3 w-3 text-primary" /> : <Copy className="h-3 w-3" />}
                       {copied ? "已复制" : "复制"}
                     </Button>
                   </div>
@@ -642,7 +642,7 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
                 <Button
                   size="sm"
                   variant={inCompare ? "secondary" : "default"}
-                  className={inCompare ? "" : "bg-emerald-600 hover:bg-emerald-700"}
+                  className={inCompare ? "" : "bg-primary hover:bg-primary/90"}
                   onClick={() => toggleCompare(detail.accession)}
                 >
                   <GitCompare className="mr-1 h-3.5 w-3.5" />

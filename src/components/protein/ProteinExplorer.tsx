@@ -10,7 +10,7 @@ import { fetchBootstrap } from "./api";
 import type { BootstrapDTO } from "@/lib/protein-types";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Dna, Search, Network, GitCompare, ListTree } from "lucide-react";
+import { Search, Network, GitCompare, ListTree } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toaster } from "@/components/ui/sonner";
@@ -130,85 +130,137 @@ export function ProteinExplorer() {
     <QueryClientProvider client={queryClient}>
       <Toaster position="bottom-center" richColors />
       <div className="flex min-h-screen flex-col bg-background text-foreground">
-        {/* 顶部导航 */}
-        <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-          <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-6">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
-                <Dna className="h-5 w-5" />
-              </div>
-              <div className="leading-tight">
-                <h1 className="text-base font-bold tracking-tight sm:text-lg">蛋白分类树浏览器</h1>
-                <p className="hidden text-[11px] text-muted-foreground sm:block">
-                  全量蛋白组 · 10 种模式生物 Swiss-Prot reviewed 蛋白组
+        {/* 期刊式页头 */}
+        <header className="border-b border-border">
+          <div className="mx-auto max-w-[1400px] px-4 pt-10 pb-6 sm:px-6 sm:pt-14 sm:pb-8">
+            <div className="flex items-start justify-between gap-6">
+              <div className="min-w-0">
+                <p className="overline-label flex items-center gap-2.5">
+                  <span className="inline-block h-px w-8 bg-primary/60" aria-hidden />
+                  Proteome Atlas · UniProtKB Swiss-Prot
                 </p>
+                <h1 className="mt-3 font-serif text-4xl leading-[1.08] tracking-tight text-foreground sm:text-5xl lg:text-[3.4rem]">
+                  蛋白质分类图谱
+                </h1>
+                <p className="mt-4 max-w-2xl text-[13.5px] leading-relaxed text-muted-foreground sm:text-[15px]">
+                  十种模式生物的全量 reviewed 蛋白组，依 UniProt 官方家族链组织为
+                  <span className="text-foreground"> 超家族 → 家族 → 亚家族</span>
+                  的层级谱系——从溶质载体超群到 G 蛋白偶联受体，并对照 OrthoDB 直系同源关系。
+                </p>
+              </div>
+              <div className="hidden shrink-0 items-center gap-2 md:flex">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSearchOpen(true)}
+                  className="h-9 gap-2 border-border bg-transparent font-normal text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                >
+                  <Search className="h-3.5 w-3.5" />
+                  <span>检索</span>
+                  <kbd className="ml-1 rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">⌘K</kbd>
+                </Button>
+                <ThemeToggle />
               </div>
             </div>
 
-            <nav className="order-3 w-full sm:order-none sm:ml-2 sm:w-auto" aria-label="视图切换">
-              <div className="flex rounded-lg border bg-muted/40 p-0.5" role="tablist">
-                {tabs.map((t) => (
+            {/* 元数据行 */}
+            {stats && (
+              <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1.5 font-mono text-[11.5px] tracking-wide text-muted-foreground">
+                <span className="font-medium text-foreground">{stats.totalProteins.toLocaleString()}</span>
+                <span>proteins</span>
+                <span aria-hidden className="text-border">/</span>
+                <span className="font-medium text-foreground">{stats.organismCount}</span>
+                <span>organisms</span>
+                <span aria-hidden className="text-border">/</span>
+                <span className="font-medium text-foreground">{stats.superfamilyCount.toLocaleString()}</span>
+                <span>superfamilies</span>
+                <span aria-hidden className="text-border">/</span>
+                <span className="font-medium text-foreground">{stats.familyCount.toLocaleString()}</span>
+                <span>families</span>
+                <span aria-hidden className="text-border">/</span>
+                <span className="font-medium text-foreground">{stats.orthologGroups.toLocaleString()}</span>
+                <span>ortholog groups</span>
+                <span aria-hidden className="text-border">/</span>
+                <span>{stats.dataDate}</span>
+              </div>
+            )}
+          </div>
+        </header>
+
+        {/* 粘性视图导航：下划线式 */}
+        <div className="sticky top-0 z-40 border-b border-border bg-background/92 backdrop-blur supports-[backdrop-filter]:bg-background/85">
+          <div className="mx-auto flex max-w-[1400px] items-center gap-1 px-4 sm:px-6">
+            <nav aria-label="视图切换" role="tablist" className="-mb-px flex min-h-[48px] flex-1 items-stretch gap-1 overflow-x-auto sm:gap-2">
+              {tabs.map((t) => {
+                const active = view === t.key;
+                return (
                   <button
                     key={t.key}
                     role="tab"
-                    aria-selected={view === t.key}
+                    aria-selected={active}
                     onClick={() => setView(t.key)}
-                    className={`flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors sm:min-h-0 sm:flex-none sm:text-sm ${
-                      view === t.key
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
+                    className={`relative flex shrink-0 items-center gap-2 px-3 text-[13px] transition-colors sm:px-4 ${
+                      active ? "font-semibold text-foreground" : "font-medium text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     {t.icon}
                     {t.label}
+                    <span
+                      aria-hidden
+                      className={`absolute inset-x-2 bottom-0 h-[2px] transition-colors ${
+                        active ? "bg-primary" : "bg-transparent"
+                      }`}
+                    />
                   </button>
-                ))}
-              </div>
+                );
+              })}
             </nav>
-
-            <div className="ml-auto flex items-center gap-1.5">
+            <div className="flex shrink-0 items-center gap-1.5 md:hidden">
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={() => setSearchOpen(true)}
-                className="h-11 gap-2 text-muted-foreground sm:h-9"
+                className="h-11 w-11 p-0 text-muted-foreground"
+                aria-label="检索"
               >
                 <Search className="h-4 w-4" />
-                <span className="hidden sm:inline">搜索蛋白 / 家族 / 物种</span>
-                <kbd className="hidden rounded border bg-muted px-1.5 font-mono text-[10px] sm:inline">⌘K</kbd>
               </Button>
               <ThemeToggle />
             </div>
           </div>
-        </header>
+        </div>
 
-        <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-5 sm:px-6 sm:py-6">
+        <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 sm:px-6 sm:py-8">
           {error && (
-            <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-6 text-center">
-              <p className="font-medium text-destructive">数据加载失败</p>
-              <p className="mt-1 text-sm text-muted-foreground">{error}</p>
-              <Button className="mt-4" variant="outline" onClick={() => window.location.reload()}>
+            <div className="border border-destructive/40 bg-destructive/5 p-8 text-center">
+              <p className="font-serif text-xl text-destructive">数据加载失败</p>
+              <p className="mt-2 text-sm text-muted-foreground">{error}</p>
+              <Button className="mt-5" variant="outline" onClick={() => window.location.reload()}>
                 重试
               </Button>
             </div>
           )}
 
           {!data && !error && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <Skeleton key={i} className="h-24 rounded-xl" />
-                ))}
-              </div>
-              <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
-                <Skeleton className="h-[480px] rounded-xl" />
-                <Skeleton className="h-[480px] rounded-xl" />
+            <div className="space-y-6">
+              <div className="h-16 border-y border-border" />
+              <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
+                <div className="space-y-2.5">
+                  {Array.from({ length: 12 }).map((_, i) => (
+                    <Skeleton key={i} className="h-8 rounded-sm" />
+                  ))}
+                </div>
+                <div className="space-y-2.5">
+                  {Array.from({ length: 10 }).map((_, i) => (
+                    <Skeleton key={i} className="h-9 rounded-sm" />
+                  ))}
+                </div>
               </div>
             </div>
           )}
 
           {data && ctx && (
-            <div className="space-y-5">
+            <div className="space-y-7">
               <StatsBar stats={data.stats} />
               {view === "tree" && <FamilyTreeView ctx={ctx} />}
               {view === "phylo" && <PhyloView ctx={ctx} />}
@@ -217,29 +269,27 @@ export function ProteinExplorer() {
           )}
         </main>
 
-        <footer className="mt-auto border-t bg-muted/30">
-          <div className="mx-auto flex max-w-[1400px] flex-col gap-1 px-4 py-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        {/* 页脚：极简单行 */}
+        <footer className="mt-auto border-t border-border">
+          <div className="mx-auto flex max-w-[1400px] flex-col gap-1.5 px-4 py-4 text-[11.5px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <p>
-              数据来源：
+              数据
               <a
                 href="https://www.uniprot.org"
                 target="_blank"
                 rel="noreferrer"
-                className="font-medium text-emerald-700 underline-offset-2 hover:underline dark:text-emerald-400"
+                className="mx-1 font-medium text-foreground underline decoration-border underline-offset-2 transition-colors hover:decoration-primary"
               >
                 UniProtKB / Swiss-Prot
               </a>
-              <span className="mx-1.5 text-border">·</span>
-              全量 reviewed 蛋白组
-              {stats ? (
-                <>
-                  <span className="mx-1.5 text-border">·</span>
-                  {stats.totalProteins.toLocaleString()} 条 · {stats.organismCount} 物种 · {stats.superfamilyCount.toLocaleString()} 超家族 ·{" "}
-                  {stats.familyCount.toLocaleString()} 家族 · {stats.orthologGroups.toLocaleString()} 直系同源组
-                </>
-              ) : null}
+              · OrthoDB · eggNOG · PDB
+              {stats && (
+                <span className="ml-1 font-mono">
+                  （{stats.totalProteins.toLocaleString()} entries · {stats.dataDate}）
+                </span>
+              )}
             </p>
-            <p>仅供科研可视化演示 · Next.js + Prisma + Recharts 构建</p>
+            <p className="font-mono tracking-wide">Proteome Atlas · 科研可视化演示</p>
           </div>
         </footer>
 
@@ -250,22 +300,22 @@ export function ProteinExplorer() {
             {/* 比较选择浮层 */}
             {compareIds.length > 0 && view !== "compare" && (
               <div className="fixed bottom-4 left-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2">
-                <div className="flex items-center gap-3 rounded-full border bg-background/95 px-4 py-2.5 shadow-lg backdrop-blur">
+                <div className="flex items-center gap-3 border border-border bg-card px-4 py-2.5 shadow-lg">
                   <span className="shrink-0 text-sm font-medium">
-                    已选 <span className="text-emerald-600">{compareIds.length}</span>
+                    已选 <span className="font-mono text-primary">{compareIds.length}</span>
                     <span className="text-muted-foreground">/{MAX_COMPARE}</span> 个蛋白
                   </span>
                   <div className="flex min-w-0 flex-1 gap-1 overflow-hidden">
                     {compareIds.slice(0, 6).map((id) => (
                       <span
                         key={id}
-                        className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                        className="shrink-0 bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
                       >
                         {id}
                       </span>
                     ))}
                     {compareIds.length > 6 && (
-                      <span className="shrink-0 text-[10px] text-muted-foreground">+{compareIds.length - 6}</span>
+                      <span className="shrink-0 font-mono text-[10px] text-muted-foreground">+{compareIds.length - 6}</span>
                     )}
                   </div>
                   <Button variant="ghost" size="sm" className="h-11 shrink-0 px-2 text-xs sm:h-7" onClick={clearCompare}>
@@ -273,7 +323,7 @@ export function ProteinExplorer() {
                   </Button>
                   <Button
                     size="sm"
-                    className="h-11 shrink-0 rounded-full bg-emerald-600 px-4 text-xs hover:bg-emerald-700 sm:h-8"
+                    className="h-11 shrink-0 bg-primary px-4 text-xs text-primary-foreground hover:bg-primary/90 sm:h-8"
                     onClick={() => {
                       setCompareAccsSafe(compareIds);
                       setView("compare");
