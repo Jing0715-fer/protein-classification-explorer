@@ -92,6 +92,45 @@ export interface KeywordDTO {
   category: string;
 }
 
+/** 疾病关联（UniProt DISEASE 注释） */
+export interface DiseaseDTO {
+  name: string;
+  acronym: string;
+  description: string;
+  /** OMIM/MIM 编号（可能为空） */
+  mimId: string;
+}
+
+/** 分子互作对象（UniProt INTERACTION 注释，IntAct 证据） */
+export interface InteractionDTO {
+  accession: string;
+  geneName: string;
+  /** 支持实验数 */
+  experiments: number;
+  /** 是否在本库（可点击跳转详情） */
+  inDb: boolean;
+}
+
+/** 异构体（可变剪接/可变启动子） */
+export interface IsoformDTO {
+  name: string;
+  synonyms: string[];
+  ids: string[];
+  status: string;
+}
+
+/** 精选外部数据库链接 */
+export interface XrefLinkDTO {
+  /** 展示名（中文分组见 group） */
+  db: string;
+  /** 中文分组：基因与基因组/通路注释/结构预测/家族与域/直系同源/相互作用/疾病与药物/表达 */
+  group: string;
+  id: string;
+  url: string;
+  /** 附加说明（如 Reactome 通路名） */
+  note: string;
+}
+
 export interface GoTermDTO {
   id: string;
   name: string;
@@ -109,6 +148,10 @@ export interface ProteinDetailDTO {
   accession: string;
   entryName: string;
   entryType: string;
+  /** 蛋白存在性证据（Protein existence） */
+  proteinExistence: string;
+  /** UniProt 注释评分 1-5 */
+  annotationScore: number;
   proteinName: string;
   altNames: string[];
   geneName: string;
@@ -131,11 +174,26 @@ export interface ProteinDetailDTO {
   massKda: number;
   functionText: string;
   catalyticActivity: string;
+  /** 酶活性调控 */
+  activityRegulation: string;
+  /** 辅因子列表 */
+  cofactors: string[];
   subunit: string;
   tissueSpecificity: string;
+  /** 发育阶段表达 */
+  developmentalStage: string;
   induction: string;
+  /** 域功能文字注释（区别于 FT 特征） */
+  domainComment: string;
   ptm: string;
   similarity: string;
+  /** 注释警告 */
+  caution: string;
+  /** 其他注释 */
+  miscellaneous: string;
+  diseases: DiseaseDTO[];
+  isoforms: IsoformDTO[];
+  interactions: InteractionDTO[];
   subcellular: string[];
   keywords: KeywordDTO[];
   domains: string[];
@@ -144,10 +202,13 @@ export interface ProteinDetailDTO {
   pdbCount: number;
   pdbIds: string[];
   ecNumbers: string[];
+  xrefs: XrefLinkDTO[];
   sequence: string;
   firstPublicDate: string;
   lastAnnotationUpdateDate: string;
+  lastSequenceUpdateDate: string;
   entryVersion: number;
+  sequenceVersion: number;
   aaComposition: { aa: string; pct: number }[];
   orthologs: OrthologBrief[];
   source: "cache" | "live";

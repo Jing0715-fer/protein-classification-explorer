@@ -32,17 +32,20 @@ import {
 const SCROLLBAR_CLS =
   "[scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-track]:bg-transparent";
 
-/* ===== 进化树布局常量（沿用经过验证的 SVG 布局） ===== */
+/* ===== 进化树布局常量 ===== */
 const LABEL_W = 176;
 const COL_W = 68;
 const COLS = 10;
-const TREE_H = 232;
-const LEAF_Y = 168;
+/** 相邻层级垂直间距（自底向上计算） */
+const LEVEL_GAP = 26;
+/** 根节点顶部留白 */
+const ROOT_Y = 12;
 
 interface TrieNode {
   name: string;
   children: Map<string, TrieNode>;
-  taxon?: number;
+  /** 终结于该路径的物种（同一路径可容纳多个物种，如小鼠/大鼠同属啮齿目） */
+  taxa: number[];
 }
 
 interface LaidNode {
@@ -58,38 +61,59 @@ export function PhyloView({ ctx }: { ctx: ExplorerCtx }) {
 
   /* ===== A. 物种系统发生树 ===== */
   const tree = useMemo(() => {
-    const root: TrieNode = { name: "所有生物", children: new Map() };
+    const root: TrieNode = { name: "所有生物", children: new Map(), taxa: [] };
     for (const org of data.organisms) {
       let node = root;
       for (const seg of org.phyloPath.split(">")) {
         const key = seg.trim();
-        if (!node.children.has(key)) node.children.set(key, { name: key, children: new Map() });
+        if (!key) continue;
+        if (!node.children.has(key)) node.children.set(key, { name: key, children: new Map(), taxa: [] });
         node = node.children.get(key)!;
       }
-      node.taxon = org.taxonId;
+      node.taxa.push(org.taxonId);
     }
     const leafIndex = new Map(data.organisms.map((o, i) => [o.taxonId, i]));
+    const leafX = (taxon: number) => LABEL_W + (leafIndex.get(taxon) ?? 0) * COL_W + COL_W / 2;
 
-    const layout = (node: TrieNode, depth: number): LaidNode => {
-      if (node.taxon !== undefined && node.children.size === 0) {
-        const i = leafIndex.get(node.taxon) ?? 0;
-        return { name: node.name, x: LABEL_W + i * COL_W + COL_W / 2, y: LEAF_Y, taxon: node.taxon, children: [] };
+    // 自底向上布局：level = 距叶子的层数（叶子 0，内部节点 1+max 子级）
+    // 每个分类阶元各占一层，同一路径下的多个物种（啮齿目下的小鼠/大鼠）展开为并列叶子
+    const build = (node: TrieNode): LaidNode & { level: number } => {
+      const childLaid = [...node.children.values()].map(build);
+      const leafLaid: (LaidNode & { level: number })[] = node.taxa.map((t) => ({
+        name: node.name,
+        x: leafX(t),
+        y: 0,
+        taxon: t,
+        children: [],
+        level: 0,
+      }));
+      if (childLaid.length === 0 && leafLaid.length <= 1) {
+        // 纯叶子：直接返回（空节点兜底）
+        return leafLaid[0] ?? { name: node.name, x: LABEL_W / 2, y: 0, children: [], level: 0 };
       }
-      const children = [...node.children.values()].map((c) => layout(c, depth + 1));
-      // 单链压缩
-      if (children.length === 1 && node.children.size === 1) {
-        const only = [...node.children.values()][0];
-        if (only.children.size > 0 || only.taxon !== undefined) return children[0];
-      }
-      children.sort((a, b) => a.x - b.x);
+      const children = [...childLaid, ...leafLaid].sort((a, b) => a.x - b.x);
       const x = (children[0].x + children[children.length - 1].x) / 2;
-      const y = 18 + depth * 28;
-      return { name: node.name, x, y, children };
+      const level = 1 + Math.max(...children.map((c) => c.level));
+      return { name: node.name, x, y: 0, children, level };
     };
-    const laid = layout(root, 0);
-    laid.y = 10;
-    return laid;
+    const built = build(root);
+
+    // 按最大层级推导画布尺寸（根节点固定在顶部 ROOT_Y）
+    const leafY = ROOT_Y + LEVEL_GAP * built.level;
+    const treeH = leafY + 56;
+    const assignY = (node: LaidNode & { level: number }): LaidNode => {
+      const y = node.children.length === 0 ? leafY : leafY - node.level * LEVEL_GAP;
+      return {
+        name: node.name,
+        x: node.x,
+        y,
+        taxon: node.taxon,
+        children: node.children.map((c) => assignY(c as LaidNode & { level: number })),
+      };
+    };
+    return { root: assignY(built), leafY, treeH };
   }, [data]);
+  const { root: laidTree, leafY: LEAF_Y, treeH: TREE_H } = tree;
 
   const edges = useMemo(() => {
     const drops: { x1: number; y1: number; x2: number; y2: number }[] = [];
@@ -97,27 +121,27 @@ export function PhyloView({ ctx }: { ctx: ExplorerCtx }) {
     const walk = (node: LaidNode) => {
       if (node.children.length === 0) return;
       const xs = node.children.map((c) => c.x);
-      brackets.push({ x1: Math.min(...xs), x2: Math.max(...xs), y: node.y });
+      if (xs.length > 1) brackets.push({ x1: Math.min(...xs), x2: Math.max(...xs), y: node.y });
       for (const c of node.children) {
         drops.push({ x1: c.x, y1: node.y, x2: c.x, y2: c.y });
         walk(c);
       }
     };
-    walk(tree);
+    walk(laidTree);
     return { drops, brackets };
-  }, [tree]);
+  }, [laidTree]);
 
   const nodeLabels = useMemo(() => {
-    const labels: { x: number; y: number; text: string }[] = [];
+    const labels: { x: number; y: number; text: string; full: string }[] = [];
     const walk = (node: LaidNode) => {
-      if (node.children.length > 0 && node.name !== "所有生物" && node.y < LEAF_Y - 16) {
-        labels.push({ x: node.x, y: node.y - 5, text: node.name.split(" ")[0] });
+      if (node.children.length > 0 && node.name !== "所有生物" && node.y < LEAF_Y - LEVEL_GAP / 2) {
+        labels.push({ x: node.x, y: node.y - 6, text: node.name.split(" ")[0], full: node.name });
       }
       for (const c of node.children) walk(c);
     };
-    walk(tree);
+    walk(laidTree);
     return labels;
-  }, [tree]);
+  }, [laidTree, LEAF_Y]);
 
   /* ===== B. 超家族 × 物种覆盖热图（每大类 top 12，多级层级见分类树） ===== */
   const HEAT_TOP_N = 12;
@@ -213,8 +237,8 @@ export function PhyloView({ ctx }: { ctx: ExplorerCtx }) {
             <TreePine className="h-4 w-4 text-primary" />
             物种系统发生树
           </h2>
-          <p className="mt-1 text-xs text-muted-foreground">
-            10 种模式生物按系统发育关系排列（细菌 → 真菌 → 植物 → 无脊椎 → 脊椎动物），叶子标注各物种全量蛋白条目数。
+          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+            10 种模式生物按系统发育拓扑排列（细菌 → 植物 → 真菌 → 无脊椎动物 → 脊椎动物；线虫与昆虫同属蜕皮动物，鸟类与哺乳类同属羊膜动物）。叶子标注各物种 Swiss-Prot 已审核蛋白条目数；大肠杆菌含 K-12 参考株与种级泛条目，酿酒酵母含 S288C 参考株与种级条目。
           </p>
         </div>
         <div className={`overflow-x-auto ${SCROLLBAR_CLS}`}>
@@ -233,8 +257,18 @@ export function PhyloView({ ctx }: { ctx: ExplorerCtx }) {
             {edges.drops.map((d, i) => (
               <line key={`d${i}`} x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2} stroke="currentColor" className="text-foreground/40" strokeWidth="1.5" />
             ))}
+            {/* 阶元标签：paint-order 描边用卡片底色遮住穿过文字的连线 */}
             {nodeLabels.map((l, i) => (
-              <text key={`l${i}`} x={l.x} y={l.y} textAnchor="middle" fontSize="9.5" fill="currentColor" className="text-muted-foreground">
+              <text
+                key={`l${i}`}
+                x={l.x}
+                y={l.y}
+                textAnchor="middle"
+                fontSize="9.5"
+                fill="currentColor"
+                className="text-muted-foreground [paint-order:stroke] [stroke-linejoin:round] [stroke:var(--card)] [stroke-width:4]"
+              >
+                <title>{l.full}</title>
                 {l.text}
               </text>
             ))}
@@ -243,7 +277,8 @@ export function PhyloView({ ctx }: { ctx: ExplorerCtx }) {
               const cx = LABEL_W + i * COL_W + COL_W / 2;
               return (
                 <g key={o.taxonId}>
-                  <circle cx={cx} cy={LEAF_Y} r={4} fill="currentColor" className="text-foreground/70" />
+                  <title>{`${o.commonName} · ${o.scientificName}`}</title>
+                  <circle cx={cx} cy={LEAF_Y} r={4.5} fill={ORG_COLORS[o.taxonId] ?? "currentColor"} stroke="currentColor" className="text-card" strokeWidth={1.5} />
                   <text x={cx} y={LEAF_Y + 20} textAnchor="middle" fontSize="11" fontWeight={600} fill="currentColor" className="text-foreground">
                     {ORG_SHORT[o.taxonId] ?? o.commonName}
                   </text>

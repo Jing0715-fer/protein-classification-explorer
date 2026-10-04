@@ -17,7 +17,7 @@ import type { RawProtein } from "./fetch-proteomes";
 import type { FamilyRaw } from "./fetch-families";
 import { CLASSES, FAMILIES, classify } from "./classify";
 
-const TAXA = [9606, 10090, 10116, 7955, 9031, 7227, 6239, 559292, 3702, 83333];
+const TAXA = [9606, 10090, 10116, 7955, 9031, 7227, 6239, 559292, 4932, 3702, 83333, 562];
 const FAM_BY_CODE = new Map(FAMILIES.map((f) => [f.code, f]));
 
 // ===== 1) 官方链解析 =====

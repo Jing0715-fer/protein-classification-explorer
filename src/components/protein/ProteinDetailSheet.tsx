@@ -3,23 +3,31 @@
 import type { ExplorerCtx } from "./ProteinExplorer";
 import { fetchDetail } from "./api";
 import { CLASS_COLORS, classOf } from "@/lib/protein-types";
-import type { ProteinDetailDTO } from "@/lib/protein-types";
+import type { ProteinDetailDTO, XrefLinkDTO } from "@/lib/protein-types";
 import { LONG_TEXT_MAX } from "./shared";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  Baby,
   BadgeCheck,
   Boxes,
   Check,
   Copy,
+  DatabaseZap,
   ExternalLink,
   FlaskConical,
+  Gauge,
   GitCompare,
+  HeartPulse,
   Info,
+  Layers,
   MapPin,
   Microscope,
+  Network,
   Sparkles,
+  Star,
+  TriangleAlert,
   Users,
   Waves,
 } from "lucide-react";
@@ -62,6 +70,15 @@ const FEATURE_COLOR: Record<string, string> = {
   "Site": "#65a30d",
   "Active site": "#16a34a",
   "Binding site": "#4d7c0f",
+  "Chain": "#57534e",
+  "Propeptide": "#78716c",
+  "Peptide": "#8c8378",
+  "Disulfide bond": "#991b1b",
+  "Cross-link": "#9a3412",
+  "Glycosylation": "#0e7490",
+  "Lipid": "#86198f",
+  "Modified residue": "#854d0e",
+  "Calcium-binding": "#155e75",
 };
 
 /** GO 三aspect 配色：P 生物过程 / F 分子功能 / C 细胞组分 */
@@ -75,6 +92,27 @@ function featureColor(type: string): string {
   return FEATURE_COLOR[type] ?? "#94a3b8";
 }
 
+/** 蛋白存在性证据等级中文（UniProt Protein existence） */
+const PE_ZH: Record<string, string> = {
+  "1": "蛋白水平证据",
+  "2": "转录水平证据",
+  "3": "同源推断",
+  "4": "预测",
+  "5": "存疑",
+};
+
+/** 外部数据库分组固定展示顺序（未列出的组按首次出现顺序追加在末尾） */
+const XREF_GROUP_ORDER = [
+  "基因与基因组",
+  "通路注释",
+  "结构预测",
+  "家族与域",
+  "直系同源",
+  "相互作用",
+  "疾病与药物",
+  "表达",
+];
+
 /** 长文本段（折叠 + 展开） */
 function TextBlock({ text }: { text: string }) {
   const [expanded, setExpanded] = useState(false);
@@ -82,7 +120,7 @@ function TextBlock({ text }: { text: string }) {
   return (
     <div className="relative">
       <p
-        className={`whitespace-pre-wrap text-justify text-[13px] leading-relaxed text-foreground/90 ${
+        className={`whitespace-pre-wrap text-justify text-[13px] leading-relaxed break-words text-foreground/90 ${
           long && !expanded ? "max-h-44 overflow-hidden" : ""
         }`}
       >
@@ -218,6 +256,38 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
 
   const orgTaxa = useMemo(() => new Set(data.organisms.map((o) => o.taxonId)), [data]);
 
+  /** 版本与关键日期行（仅拼接非空部分） */
+  const versionLine = useMemo(() => {
+    if (!detail) return "";
+    const parts: string[] = [];
+    if (detail.entryVersion) parts.push(`条目版本 v${detail.entryVersion}`);
+    if (detail.sequenceVersion) parts.push(`序列版本 v${detail.sequenceVersion}`);
+    if (detail.lastAnnotationUpdateDate) parts.push(`最近注释更新 ${detail.lastAnnotationUpdateDate}`);
+    if (detail.lastSequenceUpdateDate) parts.push(`最近序列更新 ${detail.lastSequenceUpdateDate}`);
+    if (detail.firstPublicDate) parts.push(`首次公开 ${detail.firstPublicDate}`);
+    return parts.join(" · ");
+  }, [detail]);
+
+  /** 外部数据库链接分组（固定组序 + 未知组按首次出现追加，组内保持 API 顺序） */
+  const xrefGroups = useMemo(() => {
+    if (!detail || detail.xrefs.length === 0) return null;
+    const map = new Map<string, XrefLinkDTO[]>();
+    for (const x of detail.xrefs) {
+      const list = map.get(x.group);
+      if (list) list.push(x);
+      else map.set(x.group, [x]);
+    }
+    const known = XREF_GROUP_ORDER.filter((g) => map.has(g));
+    const rest = [...map.keys()].filter((g) => !XREF_GROUP_ORDER.includes(g));
+    return [...known, ...rest].map((g) => ({ group: g, items: map.get(g)! }));
+  }, [detail]);
+
+  /** 分子互作：按实验证据数降序取前 12 行 */
+  const shownInteractions = useMemo(() => {
+    if (!detail || detail.interactions.length === 0) return [];
+    return [...detail.interactions].sort((a, b) => b.experiments - a.experiments).slice(0, 12);
+  }, [detail]);
+
   return (
     <Sheet open={!!detailAcc} onOpenChange={(o) => !o && setDetailAcc(null)}>
       <SheetContent className="w-full gap-0 overflow-y-auto p-0 sm:max-w-xl lg:max-w-2xl">
@@ -274,6 +344,25 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
                 >
                   {detail.source === "live" ? "实时抓取" : "本地缓存"}
                 </Badge>
+                {detail.proteinExistence && (
+                  <Badge
+                    variant="outline"
+                    className="border-muted-foreground/30 bg-muted/40 text-[10px] font-medium text-muted-foreground"
+                    title={detail.proteinExistence}
+                  >
+                    {PE_ZH[detail.proteinExistence.split(":")[0]?.trim() ?? ""] ?? detail.proteinExistence}
+                  </Badge>
+                )}
+                {detail.annotationScore > 0 && (
+                  <Badge
+                    variant="outline"
+                    className="gap-1 border-muted-foreground/30 bg-muted/40 text-[10px] font-medium text-muted-foreground"
+                    title="UniProt 注释完整度评分"
+                  >
+                    <Star className="h-3 w-3 text-primary" fill="currentColor" aria-hidden />
+                    {detail.annotationScore}/5
+                  </Badge>
+                )}
                 {detail.crossSpeciesGroup && (
                   <Badge variant="outline" className="gap-1 border-teal-300 bg-teal-50 text-[10px] font-medium text-teal-700 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-400">
                     跨物种直系同源组
@@ -327,7 +416,15 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
                     <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px] text-muted-foreground">
                       {detail.orthodb && (
                         <span>
-                          OrthoDB <span className="font-mono text-foreground">{detail.orthodb}</span>
+                          OrthoDB{" "}
+                          <a
+                            href={`https://www.orthodb.org/?query=${detail.orthodb}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-mono text-foreground underline-offset-2 hover:underline"
+                          >
+                            {detail.orthodb}
+                          </a>
                         </span>
                       )}
                       {detail.eggnog && (
@@ -354,7 +451,7 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
                   { label: "分子质量", value: `${detail.massKda.toLocaleString()} kDa` },
                   { label: "EC 编号", value: detail.ecNumbers.length > 0 ? detail.ecNumbers.join(", ") : "—" },
                   { label: "PDB 结构", value: detail.pdbCount > 0 ? `${detail.pdbCount} 个` : "—" },
-                  { label: "条目版本", value: `v${detail.entryVersion}` },
+                  { label: "注释评分", value: detail.annotationScore > 0 ? `${detail.annotationScore}/5` : "—" },
                   { label: "首次公开", value: detail.firstPublicDate || "—" },
                 ].map((k) => (
                   <div key={k.label} className="rounded-lg border bg-card p-2.5" title={k.value}>
@@ -363,11 +460,7 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
                   </div>
                 ))}
               </div>
-              {detail.lastAnnotationUpdateDate && (
-                <p className="-mt-3 text-[11px] text-muted-foreground">
-                  最近注释更新：<span className="font-mono">{detail.lastAnnotationUpdateDate}</span>
-                </p>
-              )}
+              {versionLine && <p className="-mt-3 text-[11px] text-muted-foreground">{versionLine}</p>}
 
               {/* PDB chips */}
               {detail.pdbIds.length > 0 && (
@@ -414,10 +507,92 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
                   <TextBlock text={detail.catalyticActivity} />
                 </div>
               )}
+              {detail.activityRegulation && (
+                <div>
+                  <SectionTitle icon={<Gauge className="h-4 w-4 text-primary" />} title="酶活性调控" sub="Activity regulation" />
+                  <TextBlock text={detail.activityRegulation} />
+                </div>
+              )}
+              {detail.cofactors.length > 0 && (
+                <div>
+                  <SectionTitle icon={<FlaskConical className="h-4 w-4 text-primary" />} title="辅因子" sub="Cofactors" />
+                  <div className="flex flex-wrap gap-1">
+                    {detail.cofactors.map((c) => (
+                      <Badge key={c} variant="secondary" className="text-[11px] font-normal">
+                        {c}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
               {detail.subunit && (
                 <div>
                   <SectionTitle icon={<Users className="h-4 w-4 text-primary" />} title="亚基结构" sub="Subunit structure" />
                   <TextBlock text={detail.subunit} />
+                </div>
+              )}
+              {detail.interactions.length > 0 && (
+                <div>
+                  <SectionTitle
+                    icon={<Network className="h-4 w-4 text-primary" />}
+                    title="分子互作"
+                    sub={`（${detail.interactions.length} 个互作对象 · IntAct 证据）`}
+                  />
+                  <div className="overflow-hidden rounded-lg border">
+                    <table className="w-full text-left text-xs" aria-label="分子互作对象列表">
+                      <thead>
+                        <tr className="bg-muted/40 [&>th]:px-2.5 [&>th]:py-1.5 [&>th]:font-medium [&>th]:text-muted-foreground">
+                          <th>登录号</th>
+                          <th>基因名</th>
+                          <th className="text-right">实验数</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {shownInteractions.map((it) => (
+                          <tr
+                            key={it.accession}
+                            className={`border-b border-border/50 transition-colors last:border-0 max-sm:[&>td]:py-3.5 ${
+                              it.inDb ? "cursor-pointer hover:bg-accent/60" : ""
+                            }`}
+                            onClick={it.inDb ? () => openDetail(it.accession) : undefined}
+                            title={it.inDb ? `点击查看 ${it.accession} 详情` : `在 UniProt 查看 ${it.accession}`}
+                          >
+                            <td className="px-2.5 py-1.5 font-mono font-semibold text-primary">
+                              {it.inDb ? (
+                                <button
+                                  type="button"
+                                  className="text-left font-mono font-semibold text-primary underline-offset-2 hover:underline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openDetail(it.accession);
+                                  }}
+                                >
+                                  {it.accession}
+                                </button>
+                              ) : (
+                                <a
+                                  href={`https://www.uniprot.org/uniprotkb/${it.accession}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 text-primary underline-offset-2 hover:underline"
+                                >
+                                  {it.accession}
+                                  <ExternalLink className="h-3 w-3" aria-hidden />
+                                </a>
+                              )}
+                            </td>
+                            <td className="whitespace-nowrap px-2.5 py-1.5 font-mono text-[11px]">{it.geneName || "—"}</td>
+                            <td className="px-2.5 py-1.5 text-right tabular-nums text-muted-foreground">{it.experiments}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {detail.interactions.length > 12 && (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      仅显示实验证据数最多的前 12 个互作对象，共 {detail.interactions.length} 个
+                    </p>
+                  )}
                 </div>
               )}
               {detail.tissueSpecificity && (
@@ -426,10 +601,47 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
                   <TextBlock text={detail.tissueSpecificity} />
                 </div>
               )}
+              {detail.developmentalStage && (
+                <div>
+                  <SectionTitle icon={<Baby className="h-4 w-4 text-primary" />} title="发育阶段" sub="Developmental stage" />
+                  <TextBlock text={detail.developmentalStage} />
+                </div>
+              )}
               {detail.induction && (
                 <div>
                   <SectionTitle icon={<Sparkles className="h-4 w-4 text-primary" />} title="诱导表达" sub="Induction" />
                   <TextBlock text={detail.induction} />
+                </div>
+              )}
+              {detail.diseases.length > 0 && (
+                <div>
+                  <SectionTitle icon={<HeartPulse className="h-4 w-4 text-primary" />} title="疾病关联" sub="Involvement in disease · UniProt" />
+                  <div className="space-y-2">
+                    {detail.diseases.map((dz, i) => (
+                      <div key={`${dz.name}-${i}`} className="space-y-1 rounded-lg border bg-card p-3">
+                        <div className="flex flex-wrap items-center gap-1.5 break-words">
+                          <span className="break-words text-[13px] font-semibold">{dz.name}</span>
+                          {dz.acronym && (
+                            <Badge variant="outline" className="text-[10px] font-normal">
+                              {dz.acronym}
+                            </Badge>
+                          )}
+                          {dz.mimId && (
+                            <a
+                              href={`https://www.omim.org/entry/${dz.mimId}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              title={`OMIM ${dz.mimId}`}
+                              className="rounded-full border px-2 py-0.5 font-mono text-[11px] text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+                            >
+                              OMIM {dz.mimId}
+                            </a>
+                          )}
+                        </div>
+                        {dz.description && <TextBlock text={dz.description} />}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
               {detail.ptm && (
@@ -438,10 +650,57 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
                   <TextBlock text={detail.ptm} />
                 </div>
               )}
+              {detail.domainComment && (
+                <div>
+                  <SectionTitle icon={<Boxes className="h-4 w-4 text-primary" />} title="结构域注释" sub="Domain" />
+                  <TextBlock text={detail.domainComment} />
+                </div>
+              )}
               {detail.similarity && (
                 <div>
                   <SectionTitle icon={<GitCompare className="h-4 w-4 text-primary" />} title="序列相似性" sub="Similarity" />
                   <TextBlock text={detail.similarity} />
+                </div>
+              )}
+              {detail.miscellaneous && (
+                <div>
+                  <SectionTitle icon={<Info className="h-4 w-4 text-primary" />} title="其他注释" sub="Miscellaneous" />
+                  <TextBlock text={detail.miscellaneous} />
+                </div>
+              )}
+              {detail.caution && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-[13px] dark:border-amber-800 dark:bg-amber-950/60">
+                  <h4 className="flex items-center gap-1.5 text-sm font-semibold">
+                    <TriangleAlert className="h-4 w-4 text-amber-600 dark:text-amber-400" aria-hidden />
+                    注解警告
+                  </h4>
+                  <p className="mt-1 whitespace-pre-wrap break-words text-[13px] leading-relaxed text-foreground/90">{detail.caution}</p>
+                </div>
+              )}
+              {detail.isoforms.length > 0 && (
+                <div>
+                  <SectionTitle icon={<Layers className="h-4 w-4 text-primary" />} title="异构体" sub={`Isoforms · ${detail.isoforms.length} 个`} />
+                  <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                    {detail.isoforms.map((iso, i) => (
+                      <div key={`${iso.name}-${i}`} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border bg-card px-2.5 py-2">
+                        <span className="break-words text-[12px] font-semibold">{iso.name}</span>
+                        {iso.synonyms.length > 0 && <span className="break-words text-[11px] text-muted-foreground">{iso.synonyms.join("/")}</span>}
+                        {iso.ids.length > 0 && <span className="break-all font-mono text-[10px] text-muted-foreground">{iso.ids.join(" ")}</span>}
+                        {iso.status === "Displayed" ? (
+                          <Badge
+                            variant="outline"
+                            className="ml-auto border-teal-300 bg-teal-50 text-[10px] font-medium text-teal-700 dark:border-teal-800 dark:bg-teal-950 dark:text-teal-400"
+                          >
+                            展示序列
+                          </Badge>
+                        ) : iso.status ? (
+                          <Badge variant="outline" className="ml-auto border-border/80 text-[10px] font-medium text-muted-foreground">
+                            已描述
+                          </Badge>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -523,6 +782,45 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
                       <Badge key={k.id} variant="outline" className="border-border/80 text-[11px] font-normal" title={k.category}>
                         {k.name}
                       </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 外部数据库 */}
+              {xrefGroups && (
+                <div>
+                  <SectionTitle
+                    icon={<DatabaseZap className="h-4 w-4 text-primary" />}
+                    title="外部数据库"
+                    sub={`Cross-references · ${detail.xrefs.length} 条`}
+                  />
+                  <div className="space-y-2">
+                    {xrefGroups.map((g) => (
+                      <div key={g.group}>
+                        <div className="mb-1 text-[11px] font-medium text-muted-foreground">
+                          {g.group}（{g.items.length}）
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {g.items.map((x, i) => {
+                            const label = x.note || (x.id.length > 14 ? `${x.id.slice(0, 14)}…` : x.id);
+                            const fullTitle = `${x.db} · ${x.id}${x.note ? ` · ${x.note}` : ""}`;
+                            return (
+                              <a
+                                key={`${x.db}-${x.id}-${i}`}
+                                href={x.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                title={fullTitle}
+                                className="inline-flex max-w-full items-baseline gap-1 rounded-full border px-2.5 py-1 text-[11px] transition-colors hover:border-primary/60 hover:bg-primary/5"
+                              >
+                                <span className="shrink-0 font-medium">{x.db}</span>
+                                <span className={`truncate text-muted-foreground ${x.note ? "" : "font-mono"}`}>{label}</span>
+                              </a>
+                            );
+                          })}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </div>

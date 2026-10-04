@@ -199,3 +199,49 @@ Stage Summary:
 - 12 组同族分裂节点合并（fb 兜底↔官方链）；18 个伪节点清除；4 处翻译错误修正；normKey 标点归一使变体名自动合一
 - 中文名保真升级：主体译名 + 限定词保留 + 词级半翻译（"组蛋白 · 赖氨酸甲基转移酶家族"、"DNA 聚合酶 · B 型家族"、"钠离子通道 · 辅助亚基 SCN1B 家族"）
 - 数据规模：87,728 蛋白 / 10 物种 / 13 大类 / 542 超家族 / 8,058 叶子家族 / 8,717 树节点 / classifiedPct 93.5%
+
+---
+Task ID: 3-ui
+Agent: full-stack-developer
+Task: 蛋白详情抽屉富信息改版（疾病/互作/异构体/外部链接/特征轨道）
+
+Work Log:
+- 依据 src/lib/protein-types.ts 新增的 ProteinDetailDTO 富字段（proteinExistence/annotationScore/activityRegulation/cofactors/developmentalStage/domainComment/caution/miscellaneous/diseases/isoforms/interactions/xrefs/lastSequenceUpdateDate/sequenceVersion），对 src/components/protein/ProteinDetailSheet.tsx 单文件扩展（保持既有视觉语言：SectionTitle+图标+sub、TextBlock 折叠展开、chips、学术期刊暖纸风、暗色类、max-sm 触控目标）
+- 头部徽章行：新增「蛋白存在性」outline 徽章（1-5 级中文映射：蛋白水平证据/转录水平证据/同源推断/预测/存疑，title 存原始值）+「注释评分」徽章（Star 实心 primary 图标 + {score}/5，title=UniProt 注释完整度评分）
+- 关键数字网格：条目版本格替换为注释评分格（长度/分子质量/EC/PDB/注释评分/首次公开 6 格）；网格下方日期行改为拼接式「条目版本 v315 · 序列版本 v4 · 最近注释更新 · 最近序列更新 · 首次公开」（仅非空部分，保留 -mt-3 text-[11px] 样式）；OrthoDB 值改为 orthodb.org 可点击外链
+- 新增 8 个注释区（严格按规格顺序插入）：酶活性调控（Gauge）→ 辅因子 chips（FlaskConical，secondary Badge）→ 分子互作表（Network，标题显示总数「（40 个互作对象 · IntAct 证据）」，实验数降序取前 12 行，inDb 行可点开详情且登录号渲染为 button 保证键盘可达，非 inDb 行登录号为 UniProt 外链 + ExternalLink 图标，行 hover:bg-accent/60、max-sm 行高 45px）→ 发育阶段（Baby）→ 疾病关联（HeartPulse，每病一行 rounded-lg border bg-card p-3：病名 + 缩写 outline 徽章 + OMIM 圆角外链 chip，描述走 TextBlock）→ 结构域注释（Boxes，cc_domain 文字）→ 其他注释（Info）+ 注解警告（TriangleAlert，amber-300/amber-50/暗色 amber-800/amber-950/60 警示块）→ 异构体（Layers，1/2 列 chips 网格：名称 + 同义词/ + mono 登录号 + 状态徽章「展示序列」teal/「已描述」muted）
+- 新增「外部数据库」区（DatabaseZap，关键词区之后）：xrefs 按中文 group 分组，组头 text-[11px] muted 带计数，chips 为 rounded-full border px-2.5 py-1 外链（{db} + id 截断 14 字符 + …；Reactome 通路名 note 作为标签、完整 id+note 进 title；hover:border-primary/60 hover:bg-primary/5）；分组按规格固定顺序（基因与基因组→通路注释→结构预测→家族与域→直系同源→相互作用→疾病与药物→表达），未知组按首次出现追加
+- FEATURE_COLOR 补 10 类特征轨道配色：Chain/Propeptide/Peptide（暖灰系）、Disulfide bond/Cross-link（暗红/赭）、Glycosylation/Lipid/Modified residue/Calcium-binding；DomainBar 图例自动按现存类型派生
+- TextBlock 基类加 break-words（长英文病名/描述换行）；互作表加 aria-label；空数据区一律隐藏
+- 后端最小修复（tsc 报错触发、属任务允许的例外）：/api/proteins/[accession]/route.ts ① dto 补上遗漏的 proteinName: protein.proteinName（原响应缺该字段导致抽屉头部蛋白名空白，TS2741）② interactions 局部变量加 as InteractionDTO[] 断言（extractDetail 返回缺 inDb 的 TS2322，运行时 471 行已补 inDb，断言安全）
+- 验证：bun run lint 零错误；bunx tsc --noEmit src/ 零错误；agent-browser 全流程：⌘K 搜 P04637 → 疾病 8（OMIM chip 齐）/互作 40（显示 12，MDM2 117 实验，inDb 点击切换 Q00987 成功、Q07817-1 为外链）/异构体 9/外部数据库 41 条 8 组固定顺序/GO 60 条/关键数字与版本行正确；P11166 → 酶活性调控出现、DomainBar 含 Transmembrane/Topological domain/Glycosylation/Chain/Modified residue 彩轨、疾病 5；P62593 → 8 特征含 Disulfide bond/Chain/Signal 彩轨、互作 1、无疾病/异构体（正确隐藏）；暗色模式 + 移动端 390px overflowX=0（抽屉内部 scrollWidth=clientWidth）、互作行高 45px；控制台零报错零警告；VLM 视觉审查 4 轮（桌面详情/移动疾病+异构体+外链/暗色+特征轨道）均无布局缺陷
+
+Stage Summary:
+- 蛋白详情抽屉从 7 个文本区扩展为 15+ 区富信息视图：疾病关联（OMIM 外链）、分子互作（IntAct 证据、库内可跳转）、异构体、外部数据库 8 分组链接、酶活性调控/辅因子/发育阶段/结构域注释/其他注释/注解警告，头部存在性与注释评分徽章 + 版本/序列/日期元数据行，特征轨道新增 10 类配色
+- 修复后端两处 tsc 阻断错误（proteinName 缺失导致 UI 空白 + interactions 类型断言），API 响应字段完整性对拍通过（58/58 字段）
+- 交接记录：/home/z/my-project/agent-ctx/3-ui-full-stack-developer.md
+
+---
+Task ID: 11
+Agent: Z.ai Code (main)
+Task: 系统发生树修复与科学性校准 + 遗漏蛋白补全 + 详情页富信息 + 全站打磨（应用户反馈"小鼠没有连线，继续打磨，仔细检查科学性错误，检查遗漏蛋白，详情页面加入更多信息"）
+
+Work Log:
+- 【根因定位·小鼠无连线】PhyloView trie 构建用 node.taxon = org.taxonId 单值赋值——小鼠/大鼠同属"啮齿目"路径，大鼠覆盖小鼠的 taxon，小鼠叶子从树结构中消失（仅渲染列位置的圆点而无连线）
+- 【科学性排查】旧树拓扑有 3 处不严谨：① 真核生物下真菌/植物/后生动物三分并列（实际真菌与动物同属后鞭毛生物 Opisthokonta，植物更早分化）② 线虫/节肢/脊索三门并列（实际线虫与昆虫同属蜕皮动物 Ecdysozoa）③ 鸟纲与哺乳纲直接并列于脊索动物门（实际同属羊膜动物 Amniota）；硬骨鱼 Osteichthyes 收窄为辐鳍鱼纲 Actinopterygii（斑马鱼）
+- 【PhyloView 重写】trie 节点改 taxa: number[]（同路径多物种展开为并列叶子）；删除单链压缩（保留每个阶元层级）；自底向上 level 布局（叶子 0、内部 1+max 子级）动态推导 LEAF_Y/TREE_H；阶元标签加 paint-order:stroke 卡片底色描边（遮住穿过文字的连线）+ <title> 完整阶元名；叶子圆点改物种色 ORG_COLORS + 卡片描边；caption 更新（细菌 → 植物 → 真菌 → …，注明菌株构成）
+- 【遗漏蛋白核查】逐 taxon 与 UniProt REST X-Total-Results 对拍：10 个参考菌株 taxon 计数全部精确一致（人 20,431/小鼠 17,283/拟南芥 16,421/大鼠 8,233/酵母 6,733/大肠杆菌 K-12 4,531/线虫 4,489/果蝇 3,904/斑马鱼 3,385/家鸡 2,318）；发现两处种级（strain-unspecified）缺口：大肠杆菌 562 有 744 条 reviewed（TEM β-内酰胺酶/溶血素/转座酶等泛种条目）、酿酒酵母 4932 有 43 条（MEL1/HAP1/AQY1/AQY2 等）——用户原始规格即写明"562/83333"，全部补入
+- 【数据管线】fetch-proteomes.ts/fetch-families.ts TARGETS 加 562+4932（含 .done 跳过逻辑，增量抓取 787 条）；classify-hierarchy.ts TAXA 同步；seed-full.ts 新增 ORG_REMAP（562→83333、4932→559292，直系同源组跨物种判定按归并后物种，避免 K-12+种级误判跨物种）；重跑分类（5.0s，四项校验全过 dedupRemaining=0）+ 重入库 88,515 条 / 10,504 组（跨物种 8,913）/ 大肠杆菌 5,275 / 酵母 6,776
+- 【后端详情 API 重写】extractDetail 扩展：DISEASE 注释结构化（病名/缩写/描述/MIM）、INTERACTION 互作（双向取对侧、按登录号去重保最大实验数、cap 40、GET 层标注 inDb 可跳转）、ALTERNATIVE PRODUCTS 异构体、COFACTOR 辅因子、DEVELOPMENTAL STAGE/ACTIVITY REGULATION/CAUTION/MISCELLANEOUS/DOMAIN 文本区、entryAudit 序列版本与序列更新日期、proteinExistence/annotationScore；特征轨道类型扩至 24 种按优先级排序 cap 60（新增 Transmembrane/Signal/Disulfide bond/Glycosylation/Chain 等）；精选 20 个交叉引用库构造 URL（Ensembl/RefSeq/GeneID/HGNC/Reactome/KEGG/AlphaFold/Swiss-Model/Pfam/InterPro/PROSITE/PANTHER/TCDB/OrthoDB/STRING/OMIM/ChEMBL/DrugBank/IUPHAR/PharmGKB/HPA，全部 curl 实测可达，eggNOG v6 站点失联保持文本）；GO cap 24→60、关键词 40→48、亚细胞 8→10
+- 【潜伏 bug 修复】CATALYTIC ACTIVITY 的 reaction 字段为单对象非数组——(c.reaction ?? []).map 抛 TypeError 被静默吞掉（自旧版即存在，凡含催化活性注释的蛋白如 P11166 实时详情全部静默降级为空）；改 Array.isArray 双态兼容；catch 增加 console.error 暴露错误
+- 【详情 UI 委派】full-stack-developer 子代理（Task 3-ui）完成 ProteinDetailSheet 975 行富信息改版，并顺手修复 route.ts 缺 proteinName 字段的真实 bug（详见其 worklog 段）
+- 【文案校准】layout.tsx meta 87,728→88,515（注明菌株构成）；页头/页脚/统计条均为动态数据无需改
+- 【科学性抽查】新蛋白分类人工复核：TEM β-内酰胺酶→class-A beta-lactamase family、溶血素→RTX prokaryotic toxin、HlyC→RTX toxin acyltransferase、酵母糖化酶→glycosyl hydrolase 15、HAP1→锌指转录因子、AQY2→水通道蛋白家族——全部正确；MFS/钾离子通道家族/GPCR 超家族单节点唯一性复核通过
+- 【验证】bun run lint 零错误；bunx tsc src/ 零错误（examples/scripts 预存 Bun 类型声明错误不涉）；dev server 双 fork守护重启清缓存；Agent Browser：进化树 10 物种逐列连线检测全✓（含小鼠/大鼠姐妹对）、⌘K 搜索 P04637/P11166 详情（疾病 8+5、互作 40、异构体 9、外部数据库 41 条 8 组、GLUT1 特征轨道 47 矩形含跨膜段）、家族树黄金路径（通道与转运→MFS 酵母 VBA4）、暗色模式（真实 .dark 类切换）、移动端 390px scrollWidth=390 无溢出；控制台零报错、dev.log 全 200；VLM 视觉审查 4 轮（进化树/详情中部/深色/全页）："布局非常清晰，无连线交叉、无文字重叠"
+
+Stage Summary:
+- 小鼠无连线根治：多物种同路径（啮齿目下小鼠/大鼠）正确展开为姐妹叶子，全树 10/10 连线
+- 系统发生拓扑升级为严格进化关系：植物先于真菌分化（后鞭毛生物阶元显式标出）、线虫与昆虫归蜕皮动物、鸟与哺乳归羊膜动物、斑马鱼标辐鳍鱼纲；叶子改物种色圆点
+- 遗漏蛋白补全：+787 条（大肠杆菌种级 744 + 酵母种级 43），全库 88,515 条；10 参考菌株与 UniProt 精确一致，种级泛条目显式并入并注明口径
+- 详情页从 7 区扩展为 15+ 区：疾病关联（OMIM）、分子互作（IntAct、库内可跳转）、异构体、外部数据库 8 分组 20 库链接、酶活性调控/辅因子/发育阶段/注解警告、蛋白存在性 + 注释评分徽章、序列/条目版本元数据行、24 类特征彩轨（跨膜/信号肽/二硫键/糖基化等）
+- 修复自旧版潜伏的 catalytic reaction 解析崩溃（含催化注释的蛋白实时详情曾静默为空）

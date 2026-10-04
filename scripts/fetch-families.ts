@@ -23,9 +23,11 @@ const TARGETS: Target[] = [
   { taxonId: 9031, commonName: "Chicken" },
   { taxonId: 7227, commonName: "Fruit fly" },
   { taxonId: 6239, commonName: "C. elegans" },
-  { taxonId: 559292, commonName: "Yeast" },
+  { taxonId: 559292, commonName: "Yeast (S288C)" },
+  { taxonId: 4932, commonName: "Yeast (species-level)" },
   { taxonId: 3702, commonName: "Arabidopsis" },
-  { taxonId: 83333, commonName: "E. coli" },
+  { taxonId: 83333, commonName: "E. coli (K-12)" },
+  { taxonId: 562, commonName: "E. coli (species-level)" },
 ];
 
 export interface FamilyRaw {

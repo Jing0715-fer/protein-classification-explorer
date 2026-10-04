@@ -27,18 +27,30 @@ interface ClassifiedProtein {
   familyCode: string;
 }
 
+/**
+ * 物种定义（按系统发育顺序排列）
+ * 大肠杆菌 = K-12 参考株 (83333) + 种级泛条目 (562)；酿酒酵母 = S288C (559292) + 种级条目 (4932)
+ * phyloPath 采用严格拓扑：植物界先于真菌/动物分化（后鞭毛生物）、线虫与节肢动物同属蜕皮动物、
+ * 鸟纲与哺乳纲同属羊膜动物、斑马鱼属辐鳍鱼纲
+ */
 const ORGANISMS = [
-  { taxonId: 83333, scientificName: "Escherichia coli (strain K12)", commonName: "大肠杆菌", phyloPath: "细菌界 Bacteria", orderRank: 1 },
-  { taxonId: 559292, scientificName: "Saccharomyces cerevisiae (strain S288C)", commonName: "酿酒酵母", phyloPath: "真核生物>真菌界 Fungi", orderRank: 2 },
-  { taxonId: 3702, scientificName: "Arabidopsis thaliana", commonName: "拟南芥", phyloPath: "真核生物>植物界 Viridiplantae", orderRank: 3 },
-  { taxonId: 6239, scientificName: "Caenorhabditis elegans", commonName: "秀丽隐杆线虫", phyloPath: "真核生物>后生动物>线虫动物门 Nematoda", orderRank: 4 },
-  { taxonId: 7227, scientificName: "Drosophila melanogaster", commonName: "黑腹果蝇", phyloPath: "真核生物>后生动物>节肢动物门 Arthropoda", orderRank: 5 },
-  { taxonId: 7955, scientificName: "Danio rerio", commonName: "斑马鱼", phyloPath: "真核生物>后生动物>脊索动物门>硬骨鱼 Osteichthyes", orderRank: 6 },
-  { taxonId: 9031, scientificName: "Gallus gallus", commonName: "红原鸡（家鸡）", phyloPath: "真核生物>后生动物>脊索动物门>鸟纲 Aves", orderRank: 7 },
-  { taxonId: 10090, scientificName: "Mus musculus", commonName: "小家鼠", phyloPath: "真核生物>后生动物>脊索动物门>哺乳纲>啮齿目 Rodentia", orderRank: 8 },
-  { taxonId: 10116, scientificName: "Rattus norvegicus", commonName: "褐家鼠", phyloPath: "真核生物>后生动物>脊索动物门>哺乳纲>啮齿目 Rodentia", orderRank: 9 },
-  { taxonId: 9606, scientificName: "Homo sapiens", commonName: "人", phyloPath: "真核生物>后生动物>脊索动物门>哺乳纲>灵长目 Primates", orderRank: 10 },
+  { taxonId: 83333, scientificName: "Escherichia coli", commonName: "大肠杆菌", phyloPath: "细菌界 Bacteria", orderRank: 1 },
+  { taxonId: 3702, scientificName: "Arabidopsis thaliana", commonName: "拟南芥", phyloPath: "真核生物>植物界 Viridiplantae", orderRank: 2 },
+  { taxonId: 559292, scientificName: "Saccharomyces cerevisiae", commonName: "酿酒酵母", phyloPath: "真核生物>后鞭毛生物 Opisthokonta>真菌界 Fungi", orderRank: 3 },
+  { taxonId: 6239, scientificName: "Caenorhabditis elegans", commonName: "秀丽隐杆线虫", phyloPath: "真核生物>后鞭毛生物>后生动物 Metazoa>蜕皮动物 Ecdysozoa>线虫动物门 Nematoda", orderRank: 4 },
+  { taxonId: 7227, scientificName: "Drosophila melanogaster", commonName: "黑腹果蝇", phyloPath: "真核生物>后鞭毛生物>后生动物>蜕皮动物>节肢动物门 Arthropoda", orderRank: 5 },
+  { taxonId: 7955, scientificName: "Danio rerio", commonName: "斑马鱼", phyloPath: "真核生物>后鞭毛生物>后生动物>脊索动物门 Chordata>辐鳍鱼纲 Actinopterygii", orderRank: 6 },
+  { taxonId: 9031, scientificName: "Gallus gallus", commonName: "红原鸡（家鸡）", phyloPath: "真核生物>后鞭毛生物>后生动物>脊索动物门>羊膜动物 Amniota>鸟纲 Aves", orderRank: 7 },
+  { taxonId: 10090, scientificName: "Mus musculus", commonName: "小家鼠", phyloPath: "真核生物>后鞭毛生物>后生动物>脊索动物门>羊膜动物>哺乳纲 Mammalia>啮齿目 Rodentia", orderRank: 8 },
+  { taxonId: 10116, scientificName: "Rattus norvegicus", commonName: "褐家鼠", phyloPath: "真核生物>后鞭毛生物>后生动物>脊索动物门>羊膜动物>哺乳纲>啮齿目", orderRank: 9 },
+  { taxonId: 9606, scientificName: "Homo sapiens", commonName: "人", phyloPath: "真核生物>后鞭毛生物>后生动物>脊索动物门>羊膜动物>哺乳纲>灵长目 Primates", orderRank: 10 },
 ];
+
+/** 菌株/种级 taxon → 归并目标物种（蛋白组统计与直系同源组跨物种判定按归并后物种计算） */
+const ORG_REMAP = new Map<number, number>([
+  [562, 83333],
+  [4932, 559292],
+]);
 
 const ORG_RANK = new Map(ORGANISMS.map((o) => [o.taxonId, o.orderRank]));
 
@@ -77,11 +89,17 @@ async function main() {
     buf = lines.pop() ?? "";
     for (const line of lines) {
       if (!line.trim()) continue;
-      proteins.push(JSON.parse(line));
+      const p = JSON.parse(line) as ClassifiedProtein;
+      p.organismId = ORG_REMAP.get(p.organismId) ?? p.organismId; // 菌株/种级归并
+      proteins.push(p);
       read++;
     }
   }
-  if (buf.trim()) proteins.push(JSON.parse(buf));
+  if (buf.trim()) {
+    const p = JSON.parse(buf) as ClassifiedProtein;
+    p.organismId = ORG_REMAP.get(p.organismId) ?? p.organismId;
+    proteins.push(p);
+  }
   console.log(`读取 ${proteins.length} 条蛋白 (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
 
   // 2) 清空旧数据
