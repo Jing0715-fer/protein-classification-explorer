@@ -28,22 +28,27 @@ interface ClassifiedProtein {
 }
 
 /**
- * 物种定义（按系统发育顺序排列）
+ * 物种定义（按系统发育顺序排列，谱系对照 NCBI Taxonomy 校准）
  * 大肠杆菌 = K-12 参考株 (83333) + 种级泛条目 (562)；酿酒酵母 = S288C (559292) + 种级条目 (4932)
- * phyloPath 采用严格拓扑：植物界先于真菌/动物分化（后鞭毛生物）、线虫与节肢动物同属蜕皮动物、
- * 鸟纲与哺乳纲同属羊膜动物、斑马鱼属辐鳍鱼纲
+ *
+ * phyloPath 严格拓扑（每个分岔节点均为单系群，节点名 = 中文阶元 + 拉丁名）：
+ * - 根为细胞生物（PhyloView 渲染层命名），细菌域与真核生物域为其两大分支；
+ * - 植物界先于后鞭毛生物（真菌 + 动物）分化；
+ * - 后生动物 → 真后生动物 → 两侧对称动物 → 原口动物（蜕皮动物：线虫 + 节肢动物）/ 后口动物（脊索动物门）；
+ * - 脊索动物门 → 脊椎动物亚门 → 有颌类 → 硬骨鱼类 → 辐鳍鱼纲（斑马鱼）/ 肉鳍鱼纲 → 四足动物 → 羊膜动物（鸟纲 / 哺乳纲）；
+ * - 哺乳纲 → 灵长总目 →（啮齿目：鼠科下小鼠属/大鼠属 ｜ 灵长目：人科 → 人属）。
  */
 const ORGANISMS = [
-  { taxonId: 83333, scientificName: "Escherichia coli", commonName: "大肠杆菌", phyloPath: "细菌界 Bacteria", orderRank: 1 },
-  { taxonId: 3702, scientificName: "Arabidopsis thaliana", commonName: "拟南芥", phyloPath: "真核生物>植物界 Viridiplantae", orderRank: 2 },
-  { taxonId: 559292, scientificName: "Saccharomyces cerevisiae", commonName: "酿酒酵母", phyloPath: "真核生物>后鞭毛生物 Opisthokonta>真菌界 Fungi", orderRank: 3 },
-  { taxonId: 6239, scientificName: "Caenorhabditis elegans", commonName: "秀丽隐杆线虫", phyloPath: "真核生物>后鞭毛生物>后生动物 Metazoa>蜕皮动物 Ecdysozoa>线虫动物门 Nematoda", orderRank: 4 },
-  { taxonId: 7227, scientificName: "Drosophila melanogaster", commonName: "黑腹果蝇", phyloPath: "真核生物>后鞭毛生物>后生动物>蜕皮动物>节肢动物门 Arthropoda", orderRank: 5 },
-  { taxonId: 7955, scientificName: "Danio rerio", commonName: "斑马鱼", phyloPath: "真核生物>后鞭毛生物>后生动物>脊索动物门 Chordata>辐鳍鱼纲 Actinopterygii", orderRank: 6 },
-  { taxonId: 9031, scientificName: "Gallus gallus", commonName: "红原鸡（家鸡）", phyloPath: "真核生物>后鞭毛生物>后生动物>脊索动物门>羊膜动物 Amniota>鸟纲 Aves", orderRank: 7 },
-  { taxonId: 10090, scientificName: "Mus musculus", commonName: "小家鼠", phyloPath: "真核生物>后鞭毛生物>后生动物>脊索动物门>羊膜动物>哺乳纲 Mammalia>啮齿目 Rodentia", orderRank: 8 },
-  { taxonId: 10116, scientificName: "Rattus norvegicus", commonName: "褐家鼠", phyloPath: "真核生物>后鞭毛生物>后生动物>脊索动物门>羊膜动物>哺乳纲>啮齿目", orderRank: 9 },
-  { taxonId: 9606, scientificName: "Homo sapiens", commonName: "人", phyloPath: "真核生物>后鞭毛生物>后生动物>脊索动物门>羊膜动物>哺乳纲>灵长目 Primates", orderRank: 10 },
+  { taxonId: 83333, scientificName: "Escherichia coli", commonName: "大肠杆菌", phyloPath: "细菌域 Bacteria>变形菌门 Proteobacteria>γ-变形菌纲 Gammaproteobacteria>肠杆菌目 Enterobacterales>肠杆菌科 Enterobacteriaceae>埃希氏菌属 Escherichia", orderRank: 1 },
+  { taxonId: 3702, scientificName: "Arabidopsis thaliana", commonName: "拟南芥", phyloPath: "真核生物域 Eukaryota>植物界 Plantae>有胚植物 Embryophyta>维管植物 Tracheophyta>被子植物 Magnoliophyta>真双子叶植物 Eudicots>十字花目 Brassicales>十字花科 Brassicaceae", orderRank: 2 },
+  { taxonId: 559292, scientificName: "Saccharomyces cerevisiae", commonName: "酿酒酵母", phyloPath: "真核生物域 Eukaryota>后鞭毛生物 Opisthokonta>真菌界 Fungi>子囊菌门 Ascomycota>酵母亚门 Saccharomycotina", orderRank: 3 },
+  { taxonId: 6239, scientificName: "Caenorhabditis elegans", commonName: "秀丽隐杆线虫", phyloPath: "真核生物域 Eukaryota>后鞭毛生物 Opisthokonta>后生动物 Metazoa>真后生动物 Eumetazoa>两侧对称动物 Bilateria>原口动物 Protostomia>蜕皮动物 Ecdysozoa>线虫动物门 Nematoda>色杆纲 Chromadorea>小杆目 Rhabditida>隐杆线虫属 Caenorhabditis", orderRank: 4 },
+  { taxonId: 7227, scientificName: "Drosophila melanogaster", commonName: "黑腹果蝇", phyloPath: "真核生物域 Eukaryota>后鞭毛生物 Opisthokonta>后生动物 Metazoa>真后生动物 Eumetazoa>两侧对称动物 Bilateria>原口动物 Protostomia>蜕皮动物 Ecdysozoa>节肢动物门 Arthropoda>昆虫纲 Insecta>双翅目 Diptera>果蝇属 Drosophila", orderRank: 5 },
+  { taxonId: 7955, scientificName: "Danio rerio", commonName: "斑马鱼", phyloPath: "真核生物域 Eukaryota>后鞭毛生物 Opisthokonta>后生动物 Metazoa>真后生动物 Eumetazoa>两侧对称动物 Bilateria>后口动物 Deuterostomia>脊索动物门 Chordata>脊椎动物亚门 Vertebrata>有颌类 Gnathostomata>硬骨鱼类 Osteichthyes>辐鳍鱼纲 Actinopterygii>真骨下纲 Teleostei>鲤形目 Cypriniformes", orderRank: 6 },
+  { taxonId: 9031, scientificName: "Gallus gallus", commonName: "红原鸡（家鸡）", phyloPath: "真核生物域 Eukaryota>后鞭毛生物 Opisthokonta>后生动物 Metazoa>真后生动物 Eumetazoa>两侧对称动物 Bilateria>后口动物 Deuterostomia>脊索动物门 Chordata>脊椎动物亚门 Vertebrata>有颌类 Gnathostomata>硬骨鱼类 Osteichthyes>肉鳍鱼纲 Sarcopterygii>四足动物 Tetrapoda>羊膜动物 Amniota>鸟纲 Aves>鸡形目 Galliformes>雉科 Phasianidae", orderRank: 7 },
+  { taxonId: 10090, scientificName: "Mus musculus", commonName: "小家鼠", phyloPath: "真核生物域 Eukaryota>后鞭毛生物 Opisthokonta>后生动物 Metazoa>真后生动物 Eumetazoa>两侧对称动物 Bilateria>后口动物 Deuterostomia>脊索动物门 Chordata>脊椎动物亚门 Vertebrata>有颌类 Gnathostomata>硬骨鱼类 Osteichthyes>肉鳍鱼纲 Sarcopterygii>四足动物 Tetrapoda>羊膜动物 Amniota>哺乳纲 Mammalia>灵长总目 Euarchontoglires>啮齿目 Rodentia>鼠科 Muridae>小鼠属 Mus", orderRank: 8 },
+  { taxonId: 10116, scientificName: "Rattus norvegicus", commonName: "褐家鼠", phyloPath: "真核生物域 Eukaryota>后鞭毛生物 Opisthokonta>后生动物 Metazoa>真后生动物 Eumetazoa>两侧对称动物 Bilateria>后口动物 Deuterostomia>脊索动物门 Chordata>脊椎动物亚门 Vertebrata>有颌类 Gnathostomata>硬骨鱼类 Osteichthyes>肉鳍鱼纲 Sarcopterygii>四足动物 Tetrapoda>羊膜动物 Amniota>哺乳纲 Mammalia>灵长总目 Euarchontoglires>啮齿目 Rodentia>鼠科 Muridae>大鼠属 Rattus", orderRank: 9 },
+  { taxonId: 9606, scientificName: "Homo sapiens", commonName: "人", phyloPath: "真核生物域 Eukaryota>后鞭毛生物 Opisthokonta>后生动物 Metazoa>真后生动物 Eumetazoa>两侧对称动物 Bilateria>后口动物 Deuterostomia>脊索动物门 Chordata>脊椎动物亚门 Vertebrata>有颌类 Gnathostomata>硬骨鱼类 Osteichthyes>肉鳍鱼纲 Sarcopterygii>四足动物 Tetrapoda>羊膜动物 Amniota>哺乳纲 Mammalia>灵长总目 Euarchontoglires>灵长目 Primates>人科 Hominidae>人属 Homo", orderRank: 10 },
 ];
 
 /** 菌株/种级 taxon → 归并目标物种（蛋白组统计与直系同源组跨物种判定按归并后物种计算） */

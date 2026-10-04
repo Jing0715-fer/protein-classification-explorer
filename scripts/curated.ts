@@ -534,16 +534,16 @@ export const FAMILIES: { code: string; name: string; nameEn: string; description
   { code: "11.3", name: "节律基因", nameEn: "Circadian clock genes", description: "period/timeless——从果蝇到哺乳动物高度保守的生物钟基因" },
 ];
 
-/** 模式生物定义（含系统发育路径，用于进化树渲染） */
+/** 模式生物定义（含系统发育路径，用于进化树渲染；谱系对照 NCBI Taxonomy 校准，详见 seed-full.ts 注释） */
 export const ORGANISMS = [
-  { taxonId: 562, scientificName: "Escherichia coli", commonName: "大肠杆菌", phyloPath: "细菌界 Bacteria", orderRank: 1, modelTag: "细菌模式生物" },
-  { taxonId: 4932, scientificName: "Saccharomyces cerevisiae", commonName: "酿酒酵母", phyloPath: "真核生物>真菌界 Fungi", orderRank: 2, modelTag: "真核模式生物" },
-  { taxonId: 3702, scientificName: "Arabidopsis thaliana", commonName: "拟南芥", phyloPath: "真核生物>植物界 Viridiplantae", orderRank: 3, modelTag: "植物模式生物" },
-  { taxonId: 6239, scientificName: "Caenorhabditis elegans", commonName: "秀丽隐杆线虫", phyloPath: "真核生物>后生动物>线虫动物门 Nematoda", orderRank: 4, modelTag: "无脊椎模式生物" },
-  { taxonId: 7227, scientificName: "Drosophila melanogaster", commonName: "黑腹果蝇", phyloPath: "真核生物>后生动物>节肢动物门 Arthropoda", orderRank: 5, modelTag: "遗传学模式生物" },
-  { taxonId: 7955, scientificName: "Danio rerio", commonName: "斑马鱼", phyloPath: "真核生物>后生动物>脊索动物门>硬骨鱼 Osteichthyes", orderRank: 6, modelTag: "脊椎发育模型" },
-  { taxonId: 9031, scientificName: "Gallus gallus", commonName: "红原鸡（家鸡）", phyloPath: "真核生物>后生动物>脊索动物门>鸟纲 Aves", orderRank: 7, modelTag: "鸟类模式生物" },
-  { taxonId: 10090, scientificName: "Mus musculus", commonName: "小家鼠", phyloPath: "真核生物>后生动物>脊索动物门>哺乳纲>啮齿目 Rodentia", orderRank: 8, modelTag: "哺乳模式生物" },
-  { taxonId: 10116, scientificName: "Rattus norvegicus", commonName: "褐家鼠", phyloPath: "真核生物>后生动物>脊索动物门>哺乳纲>啮齿目 Rodentia", orderRank: 9, modelTag: "生理药理模型" },
-  { taxonId: 9606, scientificName: "Homo sapiens", commonName: "人", phyloPath: "真核生物>后生动物>脊索动物门>哺乳纲>灵长目 Primates", orderRank: 10, modelTag: "参照物种" },
+  { taxonId: 562, scientificName: "Escherichia coli", commonName: "大肠杆菌", phyloPath: "细菌域 Bacteria>变形菌门 Proteobacteria>γ-变形菌纲 Gammaproteobacteria>肠杆菌目 Enterobacterales>肠杆菌科 Enterobacteriaceae>埃希氏菌属 Escherichia", orderRank: 1, modelTag: "细菌模式生物" },
+  { taxonId: 4932, scientificName: "Saccharomyces cerevisiae", commonName: "酿酒酵母", phyloPath: "真核生物域 Eukaryota>后鞭毛生物 Opisthokonta>真菌界 Fungi>子囊菌门 Ascomycota>酵母亚门 Saccharomycotina", orderRank: 2, modelTag: "真核模式生物" },
+  { taxonId: 3702, scientificName: "Arabidopsis thaliana", commonName: "拟南芥", phyloPath: "真核生物域 Eukaryota>植物界 Plantae>有胚植物 Embryophyta>维管植物 Tracheophyta>被子植物 Magnoliophyta>真双子叶植物 Eudicots>十字花目 Brassicales>十字花科 Brassicaceae", orderRank: 3, modelTag: "植物模式生物" },
+  { taxonId: 6239, scientificName: "Caenorhabditis elegans", commonName: "秀丽隐杆线虫", phyloPath: "真核生物域 Eukaryota>后鞭毛生物 Opisthokonta>后生动物 Metazoa>真后生动物 Eumetazoa>两侧对称动物 Bilateria>原口动物 Protostomia>蜕皮动物 Ecdysozoa>线虫动物门 Nematoda>色杆纲 Chromadorea>小杆目 Rhabditida>隐杆线虫属 Caenorhabditis", orderRank: 4, modelTag: "无脊椎模式生物" },
+  { taxonId: 7227, scientificName: "Drosophila melanogaster", commonName: "黑腹果蝇", phyloPath: "真核生物域 Eukaryota>后鞭毛生物 Opisthokonta>后生动物 Metazoa>真后生动物 Eumetazoa>两侧对称动物 Bilateria>原口动物 Protostomia>蜕皮动物 Ecdysozoa>节肢动物门 Arthropoda>昆虫纲 Insecta>双翅目 Diptera>果蝇属 Drosophila", orderRank: 5, modelTag: "遗传学模式生物" },
+  { taxonId: 7955, scientificName: "Danio rerio", commonName: "斑马鱼", phyloPath: "真核生物域 Eukaryota>后鞭毛生物 Opisthokonta>后生动物 Metazoa>真后生动物 Eumetazoa>两侧对称动物 Bilateria>后口动物 Deuterostomia>脊索动物门 Chordata>脊椎动物亚门 Vertebrata>有颌类 Gnathostomata>硬骨鱼类 Osteichthyes>辐鳍鱼纲 Actinopterygii>真骨下纲 Teleostei>鲤形目 Cypriniformes", orderRank: 6, modelTag: "脊椎发育模型" },
+  { taxonId: 9031, scientificName: "Gallus gallus", commonName: "红原鸡（家鸡）", phyloPath: "真核生物域 Eukaryota>后鞭毛生物 Opisthokonta>后生动物 Metazoa>真后生动物 Eumetazoa>两侧对称动物 Bilateria>后口动物 Deuterostomia>脊索动物门 Chordata>脊椎动物亚门 Vertebrata>有颌类 Gnathostomata>硬骨鱼类 Osteichthyes>肉鳍鱼纲 Sarcopterygii>四足动物 Tetrapoda>羊膜动物 Amniota>鸟纲 Aves>鸡形目 Galliformes>雉科 Phasianidae", orderRank: 7, modelTag: "鸟类模式生物" },
+  { taxonId: 10090, scientificName: "Mus musculus", commonName: "小家鼠", phyloPath: "真核生物域 Eukaryota>后鞭毛生物 Opisthokonta>后生动物 Metazoa>真后生动物 Eumetazoa>两侧对称动物 Bilateria>后口动物 Deuterostomia>脊索动物门 Chordata>脊椎动物亚门 Vertebrata>有颌类 Gnathostomata>硬骨鱼类 Osteichthyes>肉鳍鱼纲 Sarcopterygii>四足动物 Tetrapoda>羊膜动物 Amniota>哺乳纲 Mammalia>灵长总目 Euarchontoglires>啮齿目 Rodentia>鼠科 Muridae>小鼠属 Mus", orderRank: 8, modelTag: "哺乳模式生物" },
+  { taxonId: 10116, scientificName: "Rattus norvegicus", commonName: "褐家鼠", phyloPath: "真核生物域 Eukaryota>后鞭毛生物 Opisthokonta>后生动物 Metazoa>真后生动物 Eumetazoa>两侧对称动物 Bilateria>后口动物 Deuterostomia>脊索动物门 Chordata>脊椎动物亚门 Vertebrata>有颌类 Gnathostomata>硬骨鱼类 Osteichthyes>肉鳍鱼纲 Sarcopterygii>四足动物 Tetrapoda>羊膜动物 Amniota>哺乳纲 Mammalia>灵长总目 Euarchontoglires>啮齿目 Rodentia>鼠科 Muridae>大鼠属 Rattus", orderRank: 9, modelTag: "生理药理模型" },
+  { taxonId: 9606, scientificName: "Homo sapiens", commonName: "人", phyloPath: "真核生物域 Eukaryota>后鞭毛生物 Opisthokonta>后生动物 Metazoa>真后生动物 Eumetazoa>两侧对称动物 Bilateria>后口动物 Deuterostomia>脊索动物门 Chordata>脊椎动物亚门 Vertebrata>有颌类 Gnathostomata>硬骨鱼类 Osteichthyes>肉鳍鱼纲 Sarcopterygii>四足动物 Tetrapoda>羊膜动物 Amniota>哺乳纲 Mammalia>灵长总目 Euarchontoglires>灵长目 Primates>人科 Hominidae>人属 Homo", orderRank: 10, modelTag: "参照物种" },
 ];

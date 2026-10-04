@@ -36,10 +36,12 @@ const SCROLLBAR_CLS =
 const LABEL_W = 176;
 const COL_W = 68;
 const COLS = 10;
-/** 相邻层级垂直间距（自底向上计算） */
-const LEVEL_GAP = 26;
-/** 根节点顶部留白 */
-const ROOT_Y = 12;
+/** 相邻阶元层级垂直间距（自底向上计算）；谱系最深 18 阶元时树高约 460px */
+const LEVEL_GAP = 22;
+/** 根节点顶部留白（需容纳根标签「细胞生物」） */
+const ROOT_Y = 22;
+/** 根节点名：谱系树冠（NCBI cellular organisms） */
+const ROOT_NAME = "细胞生物 Cellular organisms";
 
 interface TrieNode {
   name: string;
@@ -61,14 +63,24 @@ export function PhyloView({ ctx }: { ctx: ExplorerCtx }) {
 
   /* ===== A. 物种系统发生树 ===== */
   const tree = useMemo(() => {
-    const root: TrieNode = { name: "所有生物", children: new Map(), taxa: [] };
+    const root: TrieNode = { name: ROOT_NAME, children: new Map(), taxa: [] };
     for (const org of data.organisms) {
       let node = root;
       for (const seg of org.phyloPath.split(">")) {
-        const key = seg.trim();
-        if (!key) continue;
-        if (!node.children.has(key)) node.children.set(key, { name: key, children: new Map(), taxa: [] });
-        node = node.children.get(key)!;
+        const trimmed = seg.trim();
+        if (!trimmed) continue;
+        // 归一化键：仅取中文阶元名（「真核生物域 Eukaryota」与「真核生物域」视为同一节点，
+        // 防止同一单系群因写法差异被拆成多条分支）
+        const key = trimmed.split(" ")[0];
+        let child = node.children.get(key);
+        if (!child) {
+          child = { name: trimmed, children: new Map(), taxa: [] };
+          node.children.set(key, child);
+        } else if (child.name.length < trimmed.length) {
+          // 保留带拉丁名的完整写法（悬停提示显示中英全称）
+          child.name = trimmed;
+        }
+        node = child;
       }
       node.taxa.push(org.taxonId);
     }
@@ -133,13 +145,13 @@ export function PhyloView({ ctx }: { ctx: ExplorerCtx }) {
 
   const nodeLabels = useMemo(() => {
     const labels: { x: number; y: number; text: string; full: string }[] = [];
-    const walk = (node: LaidNode) => {
-      if (node.children.length > 0 && node.name !== "所有生物" && node.y < LEAF_Y - LEVEL_GAP / 2) {
-        labels.push({ x: node.x, y: node.y - 6, text: node.name.split(" ")[0], full: node.name });
+    const walk = (node: LaidNode, isRoot: boolean) => {
+      if ((node.children.length > 0 || isRoot) && node.y < LEAF_Y - LEVEL_GAP / 2) {
+        labels.push({ x: node.x, y: node.y - 7, text: node.name.split(" ")[0], full: node.name });
       }
-      for (const c of node.children) walk(c);
+      for (const c of node.children) walk(c, false);
     };
-    walk(laidTree);
+    walk(laidTree, true);
     return labels;
   }, [laidTree, LEAF_Y]);
 
@@ -238,7 +250,7 @@ export function PhyloView({ ctx }: { ctx: ExplorerCtx }) {
             物种系统发生树
           </h2>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            10 种模式生物按系统发育拓扑排列（细菌 → 植物 → 真菌 → 无脊椎动物 → 脊椎动物；线虫与昆虫同属蜕皮动物，鸟类与哺乳类同属羊膜动物）。叶子标注各物种 Swiss-Prot 已审核蛋白条目数；大肠杆菌含 K-12 参考株与种级泛条目，酿酒酵母含 S288C 参考株与种级条目。
+            谱系对照 NCBI Taxonomy 校准：细菌域先于真核生物域分化，植物界为真核生物最早分化的分支之一；真菌与后生动物同属后鞭毛生物；线虫与昆虫同属蜕皮动物（原口动物），脊索动物属后口动物——经两侧对称动物、脊椎动物亚门、有颌类、硬骨鱼类（辐鳍鱼纲 / 肉鳍鱼纲 → 四足动物 → 羊膜动物）逐级分化。叶子标注各物种 Swiss-Prot 已审核蛋白条目数；竖直高度表示分类阶元层级而非分化时间；大肠杆菌含 K-12 参考株与种级泛条目，酿酒酵母含 S288C 参考株与种级条目。悬停阶元名称可查看中英全称。
           </p>
         </div>
         <div className={`overflow-x-auto ${SCROLLBAR_CLS}`}>

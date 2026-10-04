@@ -145,7 +145,7 @@ export function ProteinExplorer() {
                 <p className="mt-4 max-w-2xl text-[13.5px] leading-relaxed text-muted-foreground sm:text-[15px]">
                   十种模式生物的全量 reviewed 蛋白组，依 UniProt 官方家族链组织为
                   <span className="text-foreground"> 超家族 → 家族 → 亚家族</span>
-                  的层级谱系——从溶质载体超群到 G 蛋白偶联受体，并对照 OrthoDB 直系同源关系。
+                  的层级谱系——从溶质载体超群到 G 蛋白偶联受体；以 NCBI Taxonomy 校准的系统发生树纵览物种进化关系，对照 OrthoDB 直系同源组跨物种追踪，并在详情页深读跨膜区序列特征图谱与疾病、互作等深度注释。
                 </p>
               </div>
               <div className="hidden shrink-0 items-center gap-2 md:flex">

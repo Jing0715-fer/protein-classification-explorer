@@ -272,3 +272,29 @@ Stage Summary:
 - 核心成果：跨膜区从"淹没在单泳道里的细条"升级为独立泳道的红色胶囊条 + 脂双层背景带的学术级特征图谱，五泳道分区 + 棒棒糖位点图 + 悬停详情卡 + 中文描述翻译
 - 分类审计结论：零重名、层级完整、无空节点、无真遗漏（兜底桶 = UniProt 注释缺口的真实反映）、反向抽检 17/17 精确一致——分类体系科学性全面验证通过
 - 特征数据增强：cap 150、24 类型中文名、DNA-binding/Nucleotide binding 配色补齐
+
+---
+Task ID: 13
+Agent: Z.ai Code (main)
+Task: 系统发生树 NCBI 权威校准 + 项目介绍与 README 更新（应用户反馈"更新项目介绍和readme，进化树感觉好像不太对，需要再仔细检查一下这些物种的进化关系"）
+
+Work Log:
+- 【权威谱系取证】curl NCBI EUtils efetch 拉取 10 物种完整 lineage，逐一比对现库 phyloPath，确认旧拓扑 4 处科学性缺陷：
+  ① 辐鳍鱼纲（斑马鱼）与羊膜动物在脊索动物门下直接并列——缺 脊椎动物亚门 Vertebrata → 有颌类 Gnathostomata → 硬骨鱼类 → 肉鳍鱼纲 Sarcopterygii → 四足动物 Tetrapoda 链路（暗示辐鳍鱼与羊膜动物为姐妹群，错误）
+  ② 蜕皮动物与脊索动物门直接挂于后生动物下——缺 真后生动物 Eumetazoa → 两侧对称动物 Bilateria → 原口动物 Protostomia / 后口动物 Deuterostomia 分层
+  ③ 根"所有生物"应为"细胞生物 Cellular organisms"，Bacteria 为域级（细菌域）非"界"
+  ④ 终端粒度失衡（大肠杆菌仅到域、拟南芥仅到界，而鸡/鼠/人到目级；小鼠/大鼠在啮齿目直接分叉，实际同属鼠科 Muridae）
+- 【隐藏 bug·进化树分裂】诊断出旧数据的 trie 分裂缺陷：同一单系群因写法差异（"后鞭毛生物 Opisthokonta" vs "后鞭毛生物"）被拆成多个节点——旧树中酵母经独立分支脱离动物侧（真核生物下三叉），正是用户"感觉不太对"的直接原因
+- 【数据层修复】seed-full.ts / curated.ts / update-phylo.ts 三处同步重写 10 条 phyloPath：全部共享阶元段统一"中文+拉丁"全拼写法；补齐全部关键单系群（Eumetazoa/Bilateria/Protostomia/Deuterostomia/Vertebrata/Gnathostomata/Osteichthyes/Sarcopterygii/Tetrapoda/Euarchontoglires/Muridae 等）；终端延伸至属/科级（埃希氏菌属/十字花科/隐杆线虫属/果蝇属/鲤形目/雉科/小鼠属/大鼠属/人属）使各支深度均衡
+- 【渲染层加固】PhyloView trie 键归一化：key = 阶元段首个空格前的中文 token（"真核生物域 Eukaryota"与"真核生物域"合并为同一节点），节点名保留最长写法（悬停显示中英全称）——从结构上杜绝同类分裂再次发生
+- 【布局调整】根节点命名"细胞生物 Cellular organisms"并显示标签；LEVEL_GAP 26→22、ROOT_Y 12→22 适配 18 阶元深度（TREE_H 474）；标题说明文案重写（谱系对照 NCBI 校准、竖直高度=阶元层级非分化时间、悬停看中英全称）
+- 【DB 增量更新】scripts/update-phylo.ts 一次性更新 10 行 Organism.phyloPath（避免 88k 全量重入库）；dev server 双 fork守护重启（发现普通 nohup/setsid 会被会话回收，改用 python os.fork×2 + execvp 守护化）
+- 【项目介绍更新】ProteinExplorer 页头介绍段重写（NCBI 校准系统发生树 + OrthoDB 直系同源 + 序列特征图谱/疾病互作深度注释）；layout.tsx metadata description/keywords 同步
+- 【README 新建】仓库根 README.md（原仓库无 README）：项目简介、数据规模表（10 物种计数+菌株归并口径）、核心功能四视图、科学性说明（分类唯一性原则/兜底桶诚实性/系统发生树完整拓扑图）、技术栈、数据管线（5 脚本表+重建步骤）、本地运行、目录结构、数据源与致谢（UniProt/NCBI/OrthoDB/AlphaFold/OMIM/IntAct 等）、免责声明；download/README.md 同步重写
+- 【验证】lint 零错误；tsc src/ 零错误（scripts 预存 Bun 类型声明错误不涉）；Agent Browser：进化树 10/10 叶子连线、45 个阶元标签全局唯一（修复前 84 个含重复）、getBBox 实测标签零重叠、SVG 零越界；VLM 三轮视觉审查（全树拓扑"科学准确" + 左右分支放大图"无问题" + 移动端/暗色"无问题"）；页头新文案渲染确认；dev.log 全 200、控制台零报错
+
+Stage Summary:
+- 进化树科学性根治：拓扑对照 NCBI Taxonomy 逐阶元校准（补齐 Bilateria/Deuterostomia/Vertebrata/Gnathostomata/Osteichthyes/Sarcopterygii/Tetrapoda/Euarchontoglires/Muridae 等缺失单系群），修复"辐鳍鱼与羊膜动物并列"这一最显著错误
+- 修复隐藏的 trie 分裂 bug（同写法差异导致同一演化支被拆成多分支——旧版酵母/动物分离的直接根因），渲染层键归一化使其结构性免疫
+- 仓库新增 README.md（完整项目文档）+ 项目介绍/元数据文案更新
+- 交接：scripts/update-phylo.ts 可重跑；守护进程启动方式记录在 worklog（python 双 fork）
