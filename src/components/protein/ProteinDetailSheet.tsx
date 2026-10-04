@@ -79,7 +79,86 @@ const FEATURE_COLOR: Record<string, string> = {
   "Lipid": "#86198f",
   "Modified residue": "#854d0e",
   "Calcium-binding": "#155e75",
+  "DNA-binding": "#9333ea",
+  "Nucleotide binding": "#c026d3",
 };
+
+/** 特征类型中文名 */
+const TYPE_ZH: Record<string, string> = {
+  Domain: "结构域",
+  Repeat: "重复序列",
+  Region: "区域",
+  Motif: "基序",
+  "Compositional bias": "组成偏向区",
+  "Topological domain": "拓扑域",
+  "Transmembrane": "跨膜区",
+  "Intramembrane": "膜内区",
+  "Signal": "信号肽",
+  "Transit peptide": "转运肽",
+  "Zinc finger": "锌指",
+  "Site": "位点",
+  "Active site": "活性位点",
+  "Binding site": "结合位点",
+  "DNA-binding": "DNA 结合区",
+  "Nucleotide binding": "核苷酸结合区",
+  "Chain": "成熟肽链",
+  "Propeptide": "前肽",
+  "Peptide": "肽段",
+  "Disulfide bond": "二硫键",
+  "Cross-link": "交联",
+  "Glycosylation": "糖基化",
+  "Lipid": "脂质修饰",
+  "Modified residue": "修饰残基",
+  "Calcium-binding": "钙结合区",
+};
+
+/** 泳道分组：跨膜区独立成泳道突出显示 */
+const LANE_DEFS: { key: string; label: string; types: string[] }[] = [
+  {
+    key: "region",
+    label: "结构域与区域",
+    types: ["Domain", "Region", "Repeat", "Motif", "Zinc finger", "DNA-binding", "Nucleotide binding", "Compositional bias"],
+  },
+  { key: "membrane", label: "跨膜区", types: ["Transmembrane", "Intramembrane"] },
+  { key: "topo", label: "拓扑域", types: ["Topological domain"] },
+  { key: "peptide", label: "信号与肽段", types: ["Signal", "Transit peptide", "Chain", "Propeptide", "Peptide"] },
+  {
+    key: "site",
+    label: "位点与修饰",
+    types: ["Active site", "Binding site", "Site", "Calcium-binding", "Disulfide bond", "Cross-link", "Glycosylation", "Lipid", "Modified residue"],
+  },
+];
+
+/** 刻度尺取整步长（目标 5-9 格） */
+function niceStep(len: number): number {
+  for (const s of [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000]) {
+    if (len / s <= 9) return s;
+  }
+  return 2000;
+}
+
+/** 特征描述友好化：跨膜段编号 / 拓扑域方位翻译 */
+function featureDescZh(f: { type: string; description: string }): string | null {
+  const d = f.description;
+  if (!d) return null;
+  if (f.type === "Transmembrane") {
+    const n = d.match(/Name=(\d+)/)?.[1];
+    const helical = /helical/i.test(d);
+    const note = d.replace(/\s*[;,]?\s*Name=\d+\s*;?\s*/i, "").replace(/helical/i, "").trim();
+    const zh = `${n ? `第 ${n} 段` : ""}${helical ? "α-螺旋跨膜段" : "跨膜段"}`;
+    return note ? `${zh} · ${note}` : zh;
+  }
+  if (f.type === "Topological domain") {
+    if (/cytoplasmic/i.test(d)) return `胞质侧${d.replace(/cytoplasmic/i, "").trim() ? " · " + d : ""}`;
+    if (/extracellular/i.test(d)) return `胞外侧${d.replace(/extracellular/i, "").trim() ? " · " + d : ""}`;
+    if (/luminal/i.test(d)) return `腔内侧${d.replace(/luminal/i, "").trim() ? " · " + d : ""}`;
+    return d;
+  }
+  if (f.type === "Disulfide bond") {
+    return d.replace(/by\s+C\d+/i, "").trim() || "二硫键";
+  }
+  return d;
+}
 
 /** GO 三aspect 配色：P 生物过程 / F 分子功能 / C 细胞组分 */
 const GO_ASPECT: Record<string, { color: string; label: string }> = {
@@ -151,53 +230,211 @@ function SectionTitle({ icon, title, sub }: { icon: React.ReactNode; title: stri
   );
 }
 
-/** 结构域位置条（横向 SVG，按序列长度等比绘制） */
-function DomainBar({
+/** 序列特征图谱（多泳道：跨膜区独立泳道 + 位点棒棒糖 + 悬停详情） */
+function FeatureMap({
   features,
   length,
 }: {
   features: { type: string; description: string; start: number; end: number }[];
   length: number;
 }) {
+  const len = Math.max(1, length);
+  const [hover, setHover] = useState<{ lane: string; i: number; cx: number } | null>(null);
+
+  const lanes = useMemo(
+    () =>
+      LANE_DEFS.map((def) => ({
+        def,
+        items: features.filter((f) => def.types.includes(f.type)),
+      })).filter((l) => l.items.length > 0),
+    [features]
+  );
   const types = useMemo(() => [...new Set(features.map((f) => f.type))], [features]);
-  return (
-    <div className="mt-2">
-      <svg
-        viewBox="0 0 1000 22"
-        preserveAspectRatio="none"
-        className="h-6 w-full rounded-md border bg-muted/30"
-        role="img"
-        aria-label="结构域在序列上的位置分布"
+
+  const step = niceStep(len);
+  const ticks: number[] = [];
+  for (let t = step; t < len; t += step) ticks.push(t);
+
+  const pct = (v: number) => Math.min(100, Math.max(0, (v / len) * 100));
+
+  /** 泳道内单个特征元素（悬停 / 键盘焦点 / 触屏点击均可查看详情） */
+  const renderItem = (
+    lane: string,
+    f: { type: string; description: string; start: number; end: number },
+    i: number
+  ) => {
+    const color = featureColor(f.type);
+    const point = f.end - f.start <= 2;
+    const x = pct(f.start);
+    const w = Math.max(pct(f.end) - x, 0);
+    const cx = pct((f.start + f.end) / 2);
+    const active = hover?.lane === lane && hover?.i === i;
+    const set = () => setHover({ lane, i, cx });
+
+    const common = {
+      onMouseEnter: set,
+      onFocus: set,
+      onBlur: () => setHover((h) => (h?.lane === lane && h.i === i ? null : h)),
+      onClick: (e: React.MouseEvent) => {
+        e.stopPropagation();
+        set();
+      },
+      tabIndex: 0,
+      role: "img" as const,
+      "aria-label": `${TYPE_ZH[f.type] ?? f.type} ${f.start}-${f.end}${f.description ? ` · ${f.description}` : ""}`,
+      className: `absolute cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? "z-10" : ""}`,
+    };
+
+    if (lane === "membrane") {
+      return (
+        <div
+          key={i}
+          {...common}
+          className={`${common.className} top-1/2 h-6 -translate-y-1/2 rounded-full border border-red-900/30 shadow-sm transition-[scale,filter] hover:scale-y-110 hover:brightness-110 dark:border-red-100/20`}
+          style={{ left: `${x}%`, width: `max(${w}%, 4px)`, backgroundColor: color }}
+        >
+          <span className="pointer-events-none absolute -inset-x-1 -inset-y-1.5" />
+        </div>
+      );
+    }
+
+    if (lane === "site") {
+      if (point) {
+        return (
+          <div key={i} {...common} className={`${common.className} bottom-0 h-full w-2 -translate-x-1/2`} style={{ left: `${cx}%` }}>
+            <span className="absolute bottom-0 left-1/2 h-3.5 w-px -translate-x-1/2" style={{ backgroundColor: color }} />
+            <span
+              className="absolute bottom-3 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 rounded-[1.5px] shadow-[0_0_0_1px_rgba(255,255,255,0.45)] dark:shadow-[0_0_0_1px_rgba(0,0,0,0.35)]"
+              style={{ backgroundColor: color }}
+            />
+            <span className="pointer-events-none absolute bottom-[-4px] left-1/2 h-[calc(100%+8px)] w-3 -translate-x-1/2" />
+          </div>
+        );
+      }
+      return (
+        <div
+          key={i}
+          {...common}
+          className={`${common.className} bottom-[10px] h-[3.5px] rounded-full`}
+          style={{ left: `${x}%`, width: `max(${w}%, 4px)`, backgroundColor: color }}
+        >
+          <span className="absolute -left-[3.5px] -top-[2.5px] h-2 w-2 rotate-45 rounded-[1.5px] shadow-[0_0_0_1px_rgba(255,255,255,0.45)] dark:shadow-[0_0_0_1px_rgba(0,0,0,0.35)]" style={{ backgroundColor: color }} />
+          <span className="absolute -right-[3.5px] -top-[2.5px] h-2 w-2 rotate-45 rounded-[1.5px] shadow-[0_0_0_1px_rgba(255,255,255,0.45)] dark:shadow-[0_0_0_1px_rgba(0,0,0,0.35)]" style={{ backgroundColor: color }} />
+          <span className="pointer-events-none absolute -inset-x-1 -inset-y-2" />
+        </div>
+      );
+    }
+
+    // region / topo / peptide 泳道：横向色条
+    const isTopo = lane === "topo";
+    const cyto = /cytoplasmic/i.test(f.description);
+    const op = isTopo ? (cyto ? 0.32 : 0.18) : 0.85;
+    return (
+      <div
+        key={i}
+        {...common}
+        className={`${common.className} top-1/2 -translate-y-1/2 rounded-[3px] ${
+          isTopo ? "h-4 border" : "h-3.5 border border-black/10 dark:border-white/10"
+        } transition-[filter] hover:brightness-110`}
+        style={{
+          left: `${x}%`,
+          width: `max(${w}%, 3px)`,
+          backgroundColor: color,
+          opacity: op,
+          ...(isTopo ? { borderColor: color } : {}),
+        }}
       >
-        {features.map((f, i) => {
-          const x = (f.start / Math.max(1, length)) * 1000;
-          const w = Math.max(((f.end - f.start) / Math.max(1, length)) * 1000, 1.5);
-          return (
-            <rect
-              key={i}
-              x={x}
-              y={4}
-              width={Math.min(w, 1000 - x)}
-              height={14}
-              rx={1.5}
-              fill={featureColor(f.type)}
-              opacity={0.88}
-            >
-              <title>{`${f.type} · ${f.description} · ${f.start}-${f.end}`}</title>
-            </rect>
-          );
-        })}
-      </svg>
-      <div className="mt-1 flex justify-between font-mono text-[9px] text-muted-foreground" aria-hidden>
-        <span>1</span>
-        <span>{Math.round(length / 2).toLocaleString()}</span>
-        <span>{length.toLocaleString()}</span>
+        <span className="pointer-events-none absolute -inset-x-1 -inset-y-1.5" />
       </div>
-      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+    );
+  };
+
+  /** 泳道悬停详情卡 */
+  const tip = (lane: string) => {
+    if (!hover || hover.lane !== lane) return null;
+    const laneTypes = LANE_DEFS.find((d) => d.key === lane)?.types ?? [];
+    const f = features.filter((x) => laneTypes.includes(x.type))[hover.i];
+    if (!f) return null;
+    const color = featureColor(f.type);
+    const aa = f.end - f.start + 1;
+    return (
+      <div
+        className="pointer-events-none absolute bottom-full z-30 mb-1.5 w-max max-w-[280px] -translate-x-1/2 rounded-lg border bg-popover p-2 text-[11px] leading-relaxed shadow-lg"
+        style={{ left: `${Math.min(88, Math.max(12, hover.cx))}%` }}
+      >
+        <div className="flex items-center gap-1.5 whitespace-nowrap">
+          <span className="h-2 w-2 shrink-0 rounded-sm" style={{ backgroundColor: color }} />
+          <span className="font-semibold">{TYPE_ZH[f.type] ?? f.type}</span>
+          <span className="font-mono text-muted-foreground">
+            {f.start === f.end ? f.start : `${f.start}–${f.end}`}（{aa} aa）
+          </span>
+        </div>
+        {(() => {
+          const dz = featureDescZh(f);
+          return dz ? <div className="mt-0.5 max-w-[260px] break-words text-muted-foreground">{dz}</div> : null;
+        })()}
+      </div>
+    );
+  };
+
+  const laneH = (key: string) => (key === "membrane" ? "h-8" : key === "site" ? "h-8" : key === "topo" ? "h-5" : "h-6");
+
+  return (
+    <div className="mt-2 select-none">
+      {/* 刻度尺 */}
+      <div className="flex items-end gap-2">
+        <div className="w-[76px] shrink-0 sm:w-[92px]" aria-hidden />
+        <div className="relative h-4 flex-1">
+          {ticks.map((t) => (
+            <div key={t} className="absolute bottom-0 flex flex-col items-center" style={{ left: `${pct(t)}%` }}>
+              <span className="h-1 w-px bg-border" />
+              <span className="mt-0.5 -translate-x-1/2 font-mono text-[9px] leading-none text-muted-foreground">{t.toLocaleString()}</span>
+            </div>
+          ))}
+          <div className="absolute right-0 bottom-0 flex flex-col items-center">
+            <span className="h-1 w-px bg-border" />
+            <span className="mt-0.5 font-mono text-[9px] leading-none text-muted-foreground">{len.toLocaleString()}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 泳道 */}
+      <div className="mt-1 space-y-2">
+        {lanes.map(({ def, items }) => (
+          <div key={def.key} className="flex items-center gap-2">
+            <div className="w-[76px] shrink-0 text-right sm:w-[92px]">
+              <div className="text-[10px] leading-tight font-medium">{def.label}</div>
+              <div className="font-mono text-[9px] leading-tight text-muted-foreground">{items.length} 个</div>
+            </div>
+            <div
+              className={`relative ${laneH(def.key)} flex-1 overflow-visible rounded-md border bg-muted/30`}
+              onMouseLeave={() => setHover((h) => (h?.lane === def.key ? null : h))}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setHover(null);
+              }}
+            >
+              {/* 跨膜泳道：脂双层背景带 */}
+              {def.key === "membrane" && (
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 inset-y-[18%] rounded-sm border-y border-amber-300/50 bg-gradient-to-b from-amber-100/70 via-amber-50/40 to-amber-100/70 dark:border-amber-500/25 dark:from-amber-500/10 dark:via-amber-500/5 dark:to-amber-500/10"
+                />
+              )}
+              {/* 位点泳道：基线 */}
+              {def.key === "site" && <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-[10px] h-px bg-border" />}
+              {items.map((f, i) => renderItem(def.key, f, i))}
+              {tip(def.key)}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 类型图例 */}
+      <div className="mt-2.5 flex flex-wrap gap-x-3 gap-y-1 pl-[84px] sm:pl-[100px]">
         {types.map((t) => (
           <span key={t} className="flex items-center gap-1 text-[10px] text-muted-foreground">
             <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: featureColor(t) }} />
-            {t}
+            {TYPE_ZH[t] ?? t}
           </span>
         ))}
       </div>
@@ -718,7 +955,7 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
                 </div>
               )}
 
-              {/* 结构域 + 位置条 */}
+              {/* 结构域 + 特征图谱 */}
               {detail.domains.length > 0 && (
                 <div>
                   <SectionTitle icon={<Boxes className="h-4 w-4 text-primary" />} title="结构域" sub="Pfam / UniProt 注释" />
@@ -730,14 +967,18 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
                     ))}
                   </div>
                   {detail.domainFeatures.length > 0 && (
-                    <DomainBar features={detail.domainFeatures} length={detail.length} />
+                    <FeatureMap features={detail.domainFeatures} length={detail.length} />
                   )}
                 </div>
               )}
               {detail.domains.length === 0 && detail.domainFeatures.length > 0 && (
                 <div>
-                  <SectionTitle icon={<Boxes className="h-4 w-4 text-primary" />} title="序列特征区" sub={`${detail.domainFeatures.length} 个特征`} />
-                  <DomainBar features={detail.domainFeatures} length={detail.length} />
+                  <SectionTitle
+                    icon={<Boxes className="h-4 w-4 text-primary" />}
+                    title="序列特征图谱"
+                    sub={`${detail.domainFeatures.length} 个特征 · 悬停查看详情`}
+                  />
+                  <FeatureMap features={detail.domainFeatures} length={detail.length} />
                 </div>
               )}
 

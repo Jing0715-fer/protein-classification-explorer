@@ -236,7 +236,7 @@ function extractDetail(entry: UniEntry): {
     }))
     .slice(0, 48);
 
-  // 序列特征（按优先级排序，cap 60）
+  // 序列特征（按优先级排序，cap 150——避免重复序列密集的蛋白把跨膜/位点特征挤出）
   const feats = (entry.features ?? []).filter((f) => f.type && FEATURE_SET.has(f.type) && (f.location?.start?.value ?? 0) > 0);
   feats.sort((a, b) => FEATURE_PRIORITY.indexOf(a.type!) - FEATURE_PRIORITY.indexOf(b.type!));
   const domainFeatures: DomainFeature[] = feats
@@ -246,7 +246,7 @@ function extractDetail(entry: UniEntry): {
       start: f.location?.start?.value ?? 0,
       end: f.location?.end?.value ?? f.location?.start?.value ?? 0,
     }))
-    .slice(0, 60);
+    .slice(0, 150);
 
   const goTerms: GoTermDTO[] = (entry.uniProtKBCrossReferences ?? [])
     .filter((x) => x.database === "GO")

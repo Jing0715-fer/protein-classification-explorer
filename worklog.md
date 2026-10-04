@@ -245,3 +245,30 @@ Stage Summary:
 - 遗漏蛋白补全：+787 条（大肠杆菌种级 744 + 酵母种级 43），全库 88,515 条；10 参考菌株与 UniProt 精确一致，种级泛条目显式并入并注明口径
 - 详情页从 7 区扩展为 15+ 区：疾病关联（OMIM）、分子互作（IntAct、库内可跳转）、异构体、外部数据库 8 分组 20 库链接、酶活性调控/辅因子/发育阶段/注解警告、蛋白存在性 + 注释评分徽章、序列/条目版本元数据行、24 类特征彩轨（跨膜/信号肽/二硫键/糖基化等）
 - 修复自旧版潜伏的 catalytic reaction 解析崩溃（含催化注释的蛋白实时详情曾静默为空）
+
+---
+Task ID: 12
+Agent: Z.ai Code (main)
+Task: 序列特征图谱重设计（跨膜区醒目化）+ 分类全面审计 + UI 打磨（应用户反馈"Transmembrane 在序列特征区上的显示不太明显，需要优化。继续打磨项目内容和ui界面。继续检查所有的分类是否准确，是否存在重复或遗漏等问题"）
+
+Work Log:
+- 【分类全面审计·四道关卡】
+  ① 结构审计（scripts/audit-db.ts）：全树 8,826 节点显示名重复 = 0；code 层级完整性 = 100（无孤儿节点）；空叶子节点 = 0；10 物种计数与 UniProt 全量精确一致（88,515 条）
+  ② 兜底桶深挖（audit-buckets.ts + audit-missed.ts，分层抽样 60 条）：13.1 未分类 5,813 条 / 13.2 其他膜蛋白 2,056 条抽样全部无 UniProt 家族链（flat-file CC SIMILARITY 段为空）——兜底桶诚实反映 UniProt 注释缺口，非分类遗漏；同名家族分裂探测（audit-family-split.ts）确认为名称子串噪声（如 "Cyclin" 匹配 CDK 家族），非真实分裂
+  ③ 反向验证（audit-reverse.ts，跨 10 物种随机 20 条）：17 条有家族链的全部与本库指派精确一致（含 G4SDH4 riboflavin transporter→SLC52·RFVT 手术映射、P02717 配体门控离子通道→AChR 亚家族解析、B0LPN4 RYR2 亚家族）；3 条无链蛋白正确落入关键词兜底
+  ④ 大类 L1 分布复核：13 大类 549 超家族 8,159 叶子家族，classifiedPct 93.4%
+- 【序列特征图谱重设计（核心诉求）】ProteinDetailSheet DomainBar 单泳道（14px 高所有特征挤一行、TM 段淹没其中）→ FeatureMap 多泳道学术视图：
+  ① 五泳道分组：结构域与区域（Domain/Region/Repeat/Motif/Zinc finger/DNA-binding/Nucleotide binding/Compositional bias）/ 跨膜区（独立泳道）/ 拓扑域（Cytoplasmic 加深 0.32 vs 胞外 0.18 区分内外侧）/ 信号与肽段 / 位点与修饰（棒棒糖图）
+  ② 跨膜区醒目化三重手段：独立泳道（高度 32px 超过所有泳道）+ 红色胶囊条（24px 高 rounded-full + 深红描边 + hover 纵向放大）+ 琥珀色脂双层背景带（border-y 双线 + 渐变，暗色适配）——视觉隐喻"穿膜"
+  ③ 位点泳道专业棒棒糖渲染：点特征（糖基化/活性位点）= 基线茎 + 8px 菱形头（白/黑描边环增强对比）；区间特征（二硫键）= 基线细杆 + 两端菱形
+  ④ 自适应刻度尺（niceStep 取 5-9 格整数刻度 + 右端全长标注，对齐泳道绘图区）
+  ⑤ 悬停/键盘焦点/触屏点击三通道详情卡：类型中文 + 位置区间 + aa 长度 + 描述智能翻译（"Helical; Name=5"→"第 5 段α-螺旋跨膜段"、Cytoplasmic→胞质侧/Extracellular→胞外侧/Luminal→腔内侧）
+  ⑥ 全部 24 特征类型中文名图例；泳道标签 + 计数；pointer-events 悬停区扩展（窄特征可命中）
+- 【API 增强】domainFeatures cap 60→150（防重复序列密集蛋白把跨膜/位点特征挤出）；FEATURE_COLOR 补 DNA-binding #9333ea / Nucleotide binding #c0f26d3
+- 【验证】lint 零错误；tsc src/ 零错误；Agent Browser 全链路：P11166（GLUT1）12 TM 胶囊条 24px 高穿越琥珀带 + 悬停卡"跨膜区 12–33（22 aa）第 1 段α-螺旋跨膜段" + 拓扑域悬停"胞质侧"（科学正确：GLUT1 N 端确为胞质侧）；P62593 位点泳道 6 棒棒糖 + 2 肽段泳道；移动端 390px scrollWidth=390 零溢出、菱形 8px 清晰；暗色模式 TM 红/琥珀带/菱形全部协调；进化树小鼠三分支连线复核（x=686: 叶→哺乳纲→啮齿目→大鼠姐妹对）；MFS 家族表（酵母 VBA4 在列）；控制台零报错；VLM 视觉审查 4 轮（特征图谱/移动端/暗色/主页）均通过，移动端菱形过小问题已修复（7px→8px + 描边环 + 泳道间距 6→8px + 位点泳道 28→32px）
+- 【清理】一次性诊断脚本删除（audit-buckets/audit-family-split），保留可重跑的 audit-db/audit-missed/audit-reverse
+
+Stage Summary:
+- 核心成果：跨膜区从"淹没在单泳道里的细条"升级为独立泳道的红色胶囊条 + 脂双层背景带的学术级特征图谱，五泳道分区 + 棒棒糖位点图 + 悬停详情卡 + 中文描述翻译
+- 分类审计结论：零重名、层级完整、无空节点、无真遗漏（兜底桶 = UniProt 注释缺口的真实反映）、反向抽检 17/17 精确一致——分类体系科学性全面验证通过
+- 特征数据增强：cap 150、24 类型中文名、DNA-binding/Nucleotide binding 配色补齐
