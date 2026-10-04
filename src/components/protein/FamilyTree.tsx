@@ -2,6 +2,7 @@
 
 import type { FamilyNodeDTO } from "@/lib/protein-types";
 import { CLASS_COLORS } from "@/lib/protein-types";
+import { ORG_COLORS } from "./api";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
@@ -10,6 +11,35 @@ interface TreeProps {
   selected: string | null;
   onSelect: (code: string) => void;
   level?: number;
+}
+
+/** 家族 × 物种迷你堆叠条（40px 宽） */
+function OrgStackBar({ byOrganism, active }: { byOrganism: Record<number, number>; active: boolean }) {
+  const entries = Object.entries(byOrganism)
+    .map(([t, n]) => ({ taxon: Number(t), n }))
+    .filter((e) => e.n > 0 && ORG_COLORS[e.taxon])
+    .sort((a, b) => b.n - a.n);
+  const total = entries.reduce((s, e) => s + e.n, 0);
+  if (total <= 0) return <span className="h-2 w-10 shrink-0" aria-hidden />;
+  return (
+    <span
+      className={`flex h-2 w-10 shrink-0 overflow-hidden rounded-full transition-opacity ${
+        active ? "opacity-100" : "opacity-0 group-hover/tree:opacity-70"
+      }`}
+      title={entries.map((e) => `${e.taxon}: ${e.n}`).join(" · ")}
+      aria-hidden
+    >
+      {entries.map((e) => (
+        <span
+          key={e.taxon}
+          style={{
+            width: `${(e.n / total) * 100}%`,
+            backgroundColor: ORG_COLORS[e.taxon],
+          }}
+        />
+      ))}
+    </span>
+  );
 }
 
 export function FamilyTree({ nodes, selected, onSelect, level = 0 }: TreeProps) {
@@ -36,7 +66,7 @@ export function FamilyTree({ nodes, selected, onSelect, level = 0 }: TreeProps) 
         return (
           <div key={node.code} role="treeitem" aria-expanded={hasChildren ? !isCollapsed : undefined} aria-selected={isSelected}>
             <div
-              className={`group flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-1.5 text-sm transition-colors ${
+              className={`group/tree flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-1.5 text-sm transition-colors ${
                 isSelected
                   ? "bg-emerald-50 font-medium text-emerald-800 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900"
                   : "hover:bg-accent"
@@ -65,12 +95,18 @@ export function FamilyTree({ nodes, selected, onSelect, level = 0 }: TreeProps) 
                 aria-hidden
               />
               <span className={`truncate ${isClass ? "font-semibold" : ""}`}>{node.name}</span>
+
+              {/* 家族行：物种构成迷你堆叠条 */}
+              {!isClass && <OrgStackBar byOrganism={node.byOrganism} active={isSelected} />}
+
               <span
                 className={`ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[10px] tabular-nums ${
-                  isSelected ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300" : "bg-muted text-muted-foreground"
+                  isSelected
+                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300"
+                    : "bg-muted text-muted-foreground"
                 }`}
               >
-                {isClass ? node.totalCount : node.count}
+                {isClass ? node.totalCount.toLocaleString() : node.count.toLocaleString()}
               </span>
             </div>
 

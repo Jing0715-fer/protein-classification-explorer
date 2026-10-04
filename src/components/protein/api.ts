@@ -1,6 +1,13 @@
 "use client";
 
-import type { BootstrapDTO, CompareDTO, ProteinDetailDTO } from "@/lib/protein-types";
+import type {
+  BootstrapDTO,
+  CompareDTO,
+  GroupListDTO,
+  ProteinDetailDTO,
+  ProteinListDTO,
+  SearchResultDTO,
+} from "@/lib/protein-types";
 
 let bootstrapCache: BootstrapDTO | null = null;
 let bootstrapPromise: Promise<BootstrapDTO> | null = null;
@@ -19,6 +26,60 @@ export function fetchBootstrap(): Promise<BootstrapDTO> {
       });
   }
   return bootstrapPromise;
+}
+
+export interface ProteinListQuery {
+  family?: string | null;
+  taxon?: number | null;
+  q?: string;
+  group?: string | null;
+  page?: number;
+  pageSize?: number;
+  sort?: "default" | "length" | "mass" | "accession" | "name" | "gene";
+  dir?: "asc" | "desc";
+}
+
+export async function fetchProteinList(query: ProteinListQuery): Promise<ProteinListDTO> {
+  const sp = new URLSearchParams();
+  if (query.family) sp.set("family", query.family);
+  if (query.taxon) sp.set("taxon", String(query.taxon));
+  if (query.q) sp.set("q", query.q);
+  if (query.group) sp.set("group", query.group);
+  sp.set("page", String(query.page ?? 1));
+  sp.set("pageSize", String(query.pageSize ?? 50));
+  if (query.sort && query.sort !== "default") sp.set("sort", query.sort);
+  if (query.dir) sp.set("dir", query.dir);
+  const r = await fetch(`/api/proteins?${sp.toString()}`);
+  if (!r.ok) throw new Error("加载蛋白列表失败");
+  return r.json();
+}
+
+export interface GroupListQuery {
+  cross?: boolean;
+  family?: string | null;
+  minOrganisms?: number;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export async function fetchGroups(query: GroupListQuery): Promise<GroupListDTO> {
+  const sp = new URLSearchParams();
+  if (query.cross) sp.set("cross", "1");
+  if (query.family) sp.set("family", query.family);
+  sp.set("minOrganisms", String(query.minOrganisms ?? 1));
+  if (query.q) sp.set("q", query.q);
+  sp.set("page", String(query.page ?? 1));
+  sp.set("pageSize", String(query.pageSize ?? 30));
+  const r = await fetch(`/api/groups?${sp.toString()}`);
+  if (!r.ok) throw new Error("加载直系同源组失败");
+  return r.json();
+}
+
+export async function searchAll(q: string): Promise<SearchResultDTO> {
+  const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+  if (!r.ok) throw new Error("搜索失败");
+  return r.json();
 }
 
 const detailCache = new Map<string, ProteinDetailDTO>();
@@ -41,8 +102,8 @@ export async function fetchCompare(ids: string[]): Promise<CompareDTO> {
 
 /** 物种简称（矩阵/图表用） */
 export const ORG_SHORT: Record<number, string> = {
-  562: "大肠杆菌",
-  4932: "酵母",
+  83333: "大肠杆菌",
+  559292: "酵母",
   3702: "拟南芥",
   6239: "线虫",
   7227: "果蝇",
@@ -55,8 +116,8 @@ export const ORG_SHORT: Record<number, string> = {
 
 /** 物种图表配色（按进化顺序） */
 export const ORG_COLORS: Record<number, string> = {
-  562: "#64748b",
-  4932: "#a16207",
+  83333: "#64748b",
+  559292: "#a16207",
   3702: "#4d7c0f",
   6239: "#0d9488",
   7227: "#db2777",

@@ -7,7 +7,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 模式生物 / 代表生物
+// 模式生物 / 代表生物（全量 Swiss-Prot reviewed 蛋白组）
 model Organism {
   id             Int      @id @default(autoincrement())
   taxonId        Int      @unique
@@ -29,33 +29,49 @@ model Family {
   proteins    Protein[]
 }
 
-// 蛋白条目（UniProtKB / Swiss-Prot 真实数据）
+// 蛋白条目（UniProtKB / Swiss-Prot 全量 reviewed 数据）
 model Protein {
-  id             Int      @id @default(autoincrement())
-  accession      String   @unique
-  entryName      String
-  reviewed       Boolean  @default(true)
-  proteinName    String
-  altNames       String?
-  geneName       String?
-  geneSynonyms   String?
-  organismId     Int
-  organism       Organism @relation(fields: [organismId], references: [id])
-  familyId       Int
-  family         Family   @relation(fields: [familyId], references: [id])
-  orthologGroup  String
-  length         Int
-  massKda        Float
-  functionText   String?
-  subcellular    String?
-  ptm            String?
-  keywords       String?
-  domains        String?
-  pdbCount       Int      @default(0)
-  sequence       String?
-  isRepresentative Boolean @default(false)
+  id         Int      @id @default(autoincrement())
+  accession  String   @unique
+  entryName  String
+  proteinName String
+  geneName   String?
+  organismId Int
+  organism   Organism @relation(fields: [organismId], references: [id])
+  familyId   Int
+  family     Family   @relation(fields: [familyId], references: [id])
+  groupId    String?
+  group      OrthologGroup? @relation(fields: [groupId], references: [id])
+  length     Int
+  massKda    Float
+  keywords   String? // ";".join 关键词名
+  domains    String? // ";".join 结构域特征
+  ec         String? // ";".join EC 编号
+  orthodb    String? // OrthoDB 直系同源组 ID（如 5915660at2759）
+  eggnog     String? // eggNOG 组 ID
+  sequence   String?
 
   @@index([familyId])
-  @@index([orthologGroup])
   @@index([organismId])
+  @@index([orthodb])
+  @@index([groupId])
+}
+
+// UniProt 详情缓存（点击查看时实时抓取并缓存）
+model ProteinDetail {
+  accession String   @id
+  json      String
+  fetchedAt DateTime @default(now())
+}
+
+// 直系同源组（按 OrthoDB ID 聚合，用于跨物种比较）
+model OrthologGroup {
+  id            String    @id // OrthoDB 组 ID
+  name          String // 代表蛋白名称（清洗后）
+  proteinCount  Int
+  organismCount Int
+  organismIds   String // csv taxonId
+  crossSpecies  Boolean
+  familyCode    String // 组内主要家族
+  proteins      Protein[]
 }

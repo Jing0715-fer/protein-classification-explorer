@@ -53,3 +53,10 @@ prompt
 server.log
 # Skills directory
 /skills/
+# 全量数据管道的原始大文件（可用 scripts/ 重新生成）
+download/proteomes/
+download/classified.jsonl
+download/*.log
+download/fetch-proteomes.log
+agent-ctx/
+tool-results/

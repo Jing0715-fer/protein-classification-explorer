@@ -1,0 +1,780 @@
+{
+  "classes": [
+    {
+      "code": "1",
+      "name": "酶类",
+      "nameEn": "Enzymes",
+      "color": "#059669"
+    },
+    {
+      "code": "2",
+      "name": "激酶",
+      "nameEn": "Kinases",
+      "color": "#65a30d"
+    },
+    {
+      "code": "3",
+      "name": "受体与信号转导",
+      "nameEn": "Receptors & Signaling",
+      "color": "#0d9488"
+    },
+    {
+      "code": "4",
+      "name": "转录与染色质",
+      "nameEn": "Transcription & Chromatin",
+      "color": "#e11d48"
+    },
+    {
+      "code": "5",
+      "name": "通道与转运",
+      "nameEn": "Channels & Transporters",
+      "color": "#d97706"
+    },
+    {
+      "code": "6",
+      "name": "细胞骨架与结构",
+      "nameEn": "Cytoskeleton & Structural",
+      "color": "#ea580c"
+    },
+    {
+      "code": "7",
+      "name": "胞外基质与分泌",
+      "nameEn": "ECM & Secreted",
+      "color": "#ca8a04"
+    },
+    {
+      "code": "8",
+      "name": "免疫与防御",
+      "nameEn": "Immunity & Defense",
+      "color": "#dc2626"
+    },
+    {
+      "code": "9",
+      "name": "核糖体与翻译",
+      "nameEn": "Ribosome & Translation",
+      "color": "#7c3aed"
+    },
+    {
+      "code": "10",
+      "name": "蛋白质稳态",
+      "nameEn": "Proteostasis",
+      "color": "#0891b2"
+    },
+    {
+      "code": "11",
+      "name": "细胞周期与肿瘤调控",
+      "nameEn": "Cell Cycle & Oncogenesis",
+      "color": "#db2777"
+    },
+    {
+      "code": "12",
+      "name": "核酸代谢与加工",
+      "nameEn": "Nucleic Acid Processing",
+      "color": "#c026d3"
+    },
+    {
+      "code": "13",
+      "name": "膜蛋白与其他",
+      "nameEn": "Membrane & Others",
+      "color": "#78716c"
+    }
+  ],
+  "families": [
+    {
+      "code": "1.1",
+      "name": "氧化还原酶",
+      "nameEn": "Oxidoreductases",
+      "description": "EC 1.x，催化氧化还原反应"
+    },
+    {
+      "code": "1.2",
+      "name": "细胞色素P450",
+      "nameEn": "Cytochrome P450",
+      "description": "CYP 家族血红素单加氧酶"
+    },
+    {
+      "code": "1.3",
+      "name": "转移酶",
+      "nameEn": "Transferases",
+      "description": "EC 2.x（激酶之外），转移化学基团"
+    },
+    {
+      "code": "1.4",
+      "name": "蛋白酶",
+      "nameEn": "Proteases",
+      "description": "EC 3.4.x，催化蛋白质水解"
+    },
+    {
+      "code": "1.5",
+      "name": "磷酸酶",
+      "nameEn": "Phosphatases",
+      "description": "催化磷酸基团水解（EC 3.1.3/3.1.4）"
+    },
+    {
+      "code": "1.6",
+      "name": "其他水解酶",
+      "nameEn": "Hydrolases (other)",
+      "description": "EC 3.x 中蛋白酶/磷酸酶之外的水解酶"
+    },
+    {
+      "code": "1.7",
+      "name": "裂合酶",
+      "nameEn": "Lyases",
+      "description": "EC 4.x，催化键的断裂（非水解/氧化）"
+    },
+    {
+      "code": "1.8",
+      "name": "异构酶",
+      "nameEn": "Isomerases",
+      "description": "EC 5.x，催化异构化反应"
+    },
+    {
+      "code": "1.9",
+      "name": "连接酶",
+      "nameEn": "Ligases",
+      "description": "EC 6.x，催化两分子连接（消耗 ATP）"
+    },
+    {
+      "code": "1.10",
+      "name": "易位酶与其他酶",
+      "nameEn": "Translocases & others",
+      "description": "EC 7.x 易位酶及未细分酶"
+    },
+    {
+      "code": "2.1",
+      "name": "受体酪氨酸激酶",
+      "nameEn": "Receptor tyrosine kinases",
+      "description": "RTK，跨膜受体型酪氨酸激酶（EGFR/INSR 等）"
+    },
+    {
+      "code": "2.2",
+      "name": "非受体酪氨酸激酶",
+      "nameEn": "Non-receptor tyrosine kinases",
+      "description": "胞质酪氨酸激酶（SRC/JAK/ABL 等）"
+    },
+    {
+      "code": "2.3",
+      "name": "MAPK级联激酶",
+      "nameEn": "MAPK cascade kinases",
+      "description": "促分裂原活化蛋白激酶及其上游 MEK/MAPKKK"
+    },
+    {
+      "code": "2.4",
+      "name": "周期蛋白依赖激酶",
+      "nameEn": "Cyclin-dependent kinases",
+      "description": "CDK 家族，驱动细胞周期进程"
+    },
+    {
+      "code": "2.5",
+      "name": "PKA/PKC/PKG激酶",
+      "nameEn": "PKA/PKC/PKG",
+      "description": "AGC 家族经典第二信使依赖激酶"
+    },
+    {
+      "code": "2.6",
+      "name": "植物受体样激酶",
+      "nameEn": "Plant receptor-like kinases",
+      "description": "植物 LRR/SD 类受体激酶（RLK/Pelle）"
+    },
+    {
+      "code": "2.7",
+      "name": "其他丝/苏氨酸激酶",
+      "nameEn": "Other Ser/Thr kinases",
+      "description": "CK1/CMGC/GSK 等其余丝苏氨酸蛋白激酶"
+    },
+    {
+      "code": "2.8",
+      "name": "脂质激酶",
+      "nameEn": "Lipid kinases",
+      "description": "PI3K/PI4K 等磷脂酰肌醇激酶"
+    },
+    {
+      "code": "2.9",
+      "name": "其他激酶",
+      "nameEn": "Other kinases",
+      "description": "未归入以上亚家族的激酶"
+    },
+    {
+      "code": "3.1",
+      "name": "G蛋白偶联受体",
+      "nameEn": "GPCR",
+      "description": "7 次跨膜 α 螺旋受体，第二大药物靶点家族"
+    },
+    {
+      "code": "3.2",
+      "name": "嗅觉受体",
+      "nameEn": "Olfactory receptors",
+      "description": "OR 家族，动物最大基因家族之一"
+    },
+    {
+      "code": "3.3",
+      "name": "视蛋白",
+      "nameEn": "Opsins",
+      "description": "视黄醛结合感光 GPCR"
+    },
+    {
+      "code": "3.4",
+      "name": "肿瘤坏死因子受体",
+      "nameEn": "TNF receptors",
+      "description": "TNFRSF 家族，含死亡结构域的受体"
+    },
+    {
+      "code": "3.5",
+      "name": "小GTP酶",
+      "nameEn": "Small GTPases",
+      "description": "RAS 超家族（RAS/RHO/RAB/ARF/RAN）分子开关"
+    },
+    {
+      "code": "3.6",
+      "name": "GTP酶调节子",
+      "nameEn": "GEFs & GAPs",
+      "description": "鸟苷酸交换因子与 GTP 酶激活蛋白"
+    },
+    {
+      "code": "3.7",
+      "name": "异源三聚体G蛋白",
+      "nameEn": "Heterotrimeric G proteins",
+      "description": "Gα/Gβ/Gγ 亚基"
+    },
+    {
+      "code": "3.8",
+      "name": "Toll样与细胞因子受体",
+      "nameEn": "Toll-like & cytokine receptors",
+      "description": "TLR 与白细胞介素/干扰素受体"
+    },
+    {
+      "code": "3.9",
+      "name": "SH2/SH3信号接头",
+      "nameEn": "SH2/SH3 adapters",
+      "description": "含 SH2/SH3 结构域的接头蛋白"
+    },
+    {
+      "code": "3.10",
+      "name": "生长因子",
+      "nameEn": "Growth factors",
+      "description": "EGF/FGF/VEGF/TGF-β 等分泌信号分子"
+    },
+    {
+      "code": "3.11",
+      "name": "钙调蛋白与EF-hand",
+      "nameEn": "Calmodulin & EF-hand",
+      "description": "EF-hand 钙结合信号中介"
+    },
+    {
+      "code": "3.12",
+      "name": "Wnt与β-catenin信号",
+      "nameEn": "Wnt & beta-catenin",
+      "description": "Wnt 配体/Frizzled 受体/β-catenin 通路"
+    },
+    {
+      "code": "3.13",
+      "name": "其他受体",
+      "nameEn": "Other receptors",
+      "description": "清道夫受体/LDL 受体等其余膜受体"
+    },
+    {
+      "code": "4.1",
+      "name": "锌指转录因子",
+      "nameEn": "Zinc finger TFs",
+      "description": "C2H2 及其他锌指类 DNA 结合蛋白"
+    },
+    {
+      "code": "4.2",
+      "name": "同源框因子",
+      "nameEn": "Homeobox TFs",
+      "description": "HOX/PAX 等同源结构域转录因子"
+    },
+    {
+      "code": "4.3",
+      "name": "bZIP因子",
+      "nameEn": "bZIP TFs",
+      "description": "碱性亮氨酸拉链（JUN/FOS/CREB）"
+    },
+    {
+      "code": "4.4",
+      "name": "bHLH因子",
+      "nameEn": "bHLH TFs",
+      "description": "碱性螺旋-环-螺旋（MYC/MYOD）"
+    },
+    {
+      "code": "4.5",
+      "name": "Forkhead因子",
+      "nameEn": "Forkhead TFs",
+      "description": "FOX 家族翼状螺旋因子"
+    },
+    {
+      "code": "4.6",
+      "name": "HMG-box因子",
+      "nameEn": "HMG-box TFs",
+      "description": "SOX/TCF 高迁移率族蛋白"
+    },
+    {
+      "code": "4.7",
+      "name": "核受体",
+      "nameEn": "Nuclear receptors",
+      "description": "核激素受体（类固醇/甲状腺/视黄酸受体）"
+    },
+    {
+      "code": "4.8",
+      "name": "组蛋白修饰与染色质",
+      "nameEn": "Chromatin modifiers",
+      "description": "HAT/HDAC/甲基转移酶及重塑因子"
+    },
+    {
+      "code": "4.9",
+      "name": "组蛋白",
+      "nameEn": "Histones",
+      "description": "H2A/H2B/H3/H4/H1 核小体核心蛋白"
+    },
+    {
+      "code": "4.10",
+      "name": "通用转录机器",
+      "nameEn": "General transcription machinery",
+      "description": "RNA 聚合酶 II/GTF/TBP/中介子"
+    },
+    {
+      "code": "4.11",
+      "name": "其他转录因子",
+      "nameEn": "Other TFs",
+      "description": "未归入以上家族的转录调控因子"
+    },
+    {
+      "code": "4.12",
+      "name": "其他DNA结合蛋白",
+      "nameEn": "Other DNA-binding",
+      "description": "具备 DNA 结合特征的其他蛋白"
+    },
+    {
+      "code": "5.1",
+      "name": "钾离子通道",
+      "nameEn": "Potassium channels",
+      "description": "KV/KCa/KIR 等钾通道"
+    },
+    {
+      "code": "5.2",
+      "name": "钠钙通道",
+      "nameEn": "Na/Ca channels",
+      "description": "电压门控钠通道与钙通道"
+    },
+    {
+      "code": "5.3",
+      "name": "氯离子通道",
+      "nameEn": "Chloride channels",
+      "description": "CLC/CFTR 等阴离子通道"
+    },
+    {
+      "code": "5.4",
+      "name": "配体门控与其他通道",
+      "nameEn": "Ligand-gated & other channels",
+      "description": "nAChR/GABA(NR)/谷氨酸门控、TRP、Connexin"
+    },
+    {
+      "code": "5.5",
+      "name": "溶质载体",
+      "nameEn": "Solute carriers (SLC)",
+      "description": "SLC 超家族膜转运蛋白"
+    },
+    {
+      "code": "5.6",
+      "name": "ABC转运蛋白",
+      "nameEn": "ABC transporters",
+      "description": "ATP 结合盒转运体"
+    },
+    {
+      "code": "5.7",
+      "name": "水通道蛋白",
+      "nameEn": "Aquaporins",
+      "description": "水/甘油选择性通道"
+    },
+    {
+      "code": "5.8",
+      "name": "膜孔蛋白",
+      "nameEn": "Porins",
+      "description": "细菌外膜 β 桶孔道蛋白"
+    },
+    {
+      "code": "5.9",
+      "name": "P型ATP酶与离子泵",
+      "nameEn": "P-type ATPases",
+      "description": "Na+/K+/Ca2+ transporting ATPase 离子泵"
+    },
+    {
+      "code": "5.10",
+      "name": "囊泡运输与胞吞",
+      "nameEn": "Vesicle transport",
+      "description": "SNARE/SEC/网格蛋白/发动蛋白机器"
+    },
+    {
+      "code": "5.11",
+      "name": "其他转运相关",
+      "nameEn": "Other transport",
+      "description": "未归入以上家族的转运/载体蛋白"
+    },
+    {
+      "code": "5.12",
+      "name": "核孔与核质运输",
+      "nameEn": "Nuclear pore & transport",
+      "description": "Importin/Exportin/核孔复合体"
+    },
+    {
+      "code": "6.1",
+      "name": "肌动蛋白",
+      "nameEn": "Actins",
+      "description": "ACT 肌动蛋白家族"
+    },
+    {
+      "code": "6.2",
+      "name": "微管蛋白",
+      "nameEn": "Tubulins",
+      "description": "α/β/γ 微管蛋白"
+    },
+    {
+      "code": "6.3",
+      "name": "肌球蛋白",
+      "nameEn": "Myosins",
+      "description": "肌动蛋白依赖马达家族"
+    },
+    {
+      "code": "6.4",
+      "name": "驱动与动力蛋白",
+      "nameEn": "Kinesins & Dyneins",
+      "description": "微管依赖马达蛋白"
+    },
+    {
+      "code": "6.5",
+      "name": "中间丝蛋白",
+      "nameEn": "Intermediate filaments",
+      "description": "角蛋白/核纤层蛋白/波形蛋白"
+    },
+    {
+      "code": "6.6",
+      "name": "微管结合蛋白",
+      "nameEn": "Microtubule-associated",
+      "description": "MAP/tau 等微管稳定因子"
+    },
+    {
+      "code": "6.7",
+      "name": "肌动蛋白结合蛋白",
+      "nameEn": "Actin-binding proteins",
+      "description": "Profilin/Cofilin/Spectrin 等"
+    },
+    {
+      "code": "6.8",
+      "name": "隔膜蛋白",
+      "nameEn": "Septins",
+      "description": "GTP 结合隔膜骨架蛋白"
+    },
+    {
+      "code": "6.9",
+      "name": "纤毛与鞭毛蛋白",
+      "nameEn": "Ciliary & flagellar",
+      "description": "鞭毛素/轴丝/IFT 复合体"
+    },
+    {
+      "code": "6.10",
+      "name": "光合系统蛋白",
+      "nameEn": "Photosystem proteins",
+      "description": "光系统/捕光复合物/Rubisco"
+    },
+    {
+      "code": "6.11",
+      "name": "其他结构蛋白",
+      "nameEn": "Other structural",
+      "description": "细胞骨架关联与其他结构蛋白"
+    },
+    {
+      "code": "6.12",
+      "name": "细胞粘附与连接",
+      "nameEn": "Cell adhesion & junctions",
+      "description": "钙粘蛋白/整合素/连接复合体"
+    },
+    {
+      "code": "7.1",
+      "name": "胶原蛋白",
+      "nameEn": "Collagens",
+      "description": "COL 家族三螺旋胞外基质"
+    },
+    {
+      "code": "7.2",
+      "name": "纤连蛋白类糖蛋白",
+      "nameEn": "Fibronectin & laminins",
+      "description": "FN/LN/Fibrillin 等基质糖蛋白"
+    },
+    {
+      "code": "7.3",
+      "name": "蛋白聚糖",
+      "nameEn": "Proteoglycans",
+      "description": "GAG 链修饰的胞外蛋白"
+    },
+    {
+      "code": "7.4",
+      "name": "激素与神经肽",
+      "nameEn": "Hormones & neuropeptides",
+      "description": "内分泌信号肽（胰岛素等）"
+    },
+    {
+      "code": "7.5",
+      "name": "其他分泌蛋白",
+      "nameEn": "Other secreted",
+      "description": "分泌信号的其他蛋白"
+    },
+    {
+      "code": "7.6",
+      "name": "其他胞外基质",
+      "nameEn": "Other ECM",
+      "description": "未归入以上家族的基质蛋白"
+    },
+    {
+      "code": "8.1",
+      "name": "免疫球蛋白",
+      "nameEn": "Immunoglobulins",
+      "description": "IG 轻重链（抗体分子）"
+    },
+    {
+      "code": "8.2",
+      "name": "MHC分子",
+      "nameEn": "MHC",
+      "description": "主要组织相容性复合体抗原提呈分子"
+    },
+    {
+      "code": "8.3",
+      "name": "T细胞受体",
+      "nameEn": "T-cell receptors",
+      "description": "TCR α/β/γ/δ 链"
+    },
+    {
+      "code": "8.4",
+      "name": "补体系统",
+      "nameEn": "Complement",
+      "description": "补体级联 C1-C9 及调节因子"
+    },
+    {
+      "code": "8.5",
+      "name": "干扰素与白介素",
+      "nameEn": "Interferons & interleukins",
+      "description": "IFN/IL 家族细胞因子"
+    },
+    {
+      "code": "8.6",
+      "name": "趋化因子",
+      "nameEn": "Chemokines",
+      "description": "CCL/CXCL 趋化细胞因子"
+    },
+    {
+      "code": "8.7",
+      "name": "肿瘤坏死因子",
+      "nameEn": "TNF ligands",
+      "description": "TNFSF 家族配体"
+    },
+    {
+      "code": "8.8",
+      "name": "防御素与抗菌肽",
+      "nameEn": "Defensins & antimicrobial",
+      "description": "先天免疫抗菌肽"
+    },
+    {
+      "code": "8.9",
+      "name": "植物抗病蛋白",
+      "nameEn": "Plant R proteins",
+      "description": "NBS-LRR 类植物抗病蛋白"
+    },
+    {
+      "code": "8.10",
+      "name": "限制修饰系统",
+      "nameEn": "Restriction-modification",
+      "description": "细菌限制酶/甲基化酶防御系统"
+    },
+    {
+      "code": "8.11",
+      "name": "毒素",
+      "nameEn": "Toxins",
+      "description": "微生物/动物毒素蛋白"
+    },
+    {
+      "code": "8.12",
+      "name": "其他免疫防御",
+      "nameEn": "Other immunity",
+      "description": "其余免疫相关蛋白"
+    },
+    {
+      "code": "9.1",
+      "name": "核糖体蛋白",
+      "nameEn": "Ribosomal proteins",
+      "description": "大/小亚基 r 蛋白"
+    },
+    {
+      "code": "9.2",
+      "name": "翻译因子",
+      "nameEn": "Translation factors",
+      "description": "起始/延伸/释放因子"
+    },
+    {
+      "code": "9.3",
+      "name": "氨酰tRNA合成酶",
+      "nameEn": "Aminoacyl-tRNA synthetases",
+      "description": "20 类氨基酸 tRNA 连接酶"
+    },
+    {
+      "code": "9.4",
+      "name": "核糖体生成与其他",
+      "nameEn": "Ribosome biogenesis",
+      "description": "rRNA 加工/核糖体组装因子"
+    },
+    {
+      "code": "10.1",
+      "name": "HSP70家族",
+      "nameEn": "HSP70 family",
+      "description": "70 kDa 热休克/伴护蛋白"
+    },
+    {
+      "code": "10.2",
+      "name": "HSP90家族",
+      "nameEn": "HSP90 family",
+      "description": "90 kDa 伴侣，信号激酶折叠"
+    },
+    {
+      "code": "10.3",
+      "name": "伴侣蛋白与小HSP",
+      "nameEn": "Chaperonins & small HSPs",
+      "description": "GroEL/CCT/HSP27 伴侣机器"
+    },
+    {
+      "code": "10.4",
+      "name": "泛素与类泛素",
+      "nameEn": "Ubiquitin & UBLs",
+      "description": "泛素/SUMO/NEDD8 修饰分子"
+    },
+    {
+      "code": "10.5",
+      "name": "E3泛素连接酶",
+      "nameEn": "E3 ubiquitin ligases",
+      "description": "底物特异性泛素连接酶（RING/HECT）"
+    },
+    {
+      "code": "10.6",
+      "name": "去泛素化酶",
+      "nameEn": "Deubiquitinases",
+      "description": "USP/UCH 家族泛素剪切酶"
+    },
+    {
+      "code": "10.7",
+      "name": "E1/E2结合酶",
+      "nameEn": "E1/E2 conjugating",
+      "description": "泛素激活与结合酶"
+    },
+    {
+      "code": "10.8",
+      "name": "自噬机器",
+      "nameEn": "Autophagy machinery",
+      "description": "ATG 自噬相关蛋白"
+    },
+    {
+      "code": "10.9",
+      "name": "蛋白酶体",
+      "nameEn": "Proteasome",
+      "description": "26S 蛋白酶体核心与调节颗粒"
+    },
+    {
+      "code": "10.10",
+      "name": "折叠酶",
+      "nameEn": "Folding enzymes",
+      "description": "PDI/脯氨酰异构酶（亲环素/FKBP）"
+    },
+    {
+      "code": "10.11",
+      "name": "其他分子伴侣",
+      "nameEn": "Other chaperones",
+      "description": "未归入以上家族的伴侣"
+    },
+    {
+      "code": "11.1",
+      "name": "周期蛋白",
+      "nameEn": "Cyclins",
+      "description": "CCN 家族周期调控亚基"
+    },
+    {
+      "code": "11.2",
+      "name": "CDK抑制因子",
+      "nameEn": "CDK inhibitors",
+      "description": "CDKN/INK4/CIP 家族"
+    },
+    {
+      "code": "11.3",
+      "name": "凋亡机器",
+      "nameEn": "Apoptosis machinery",
+      "description": "Caspase/BCL-2/Apaf 蛋白"
+    },
+    {
+      "code": "11.4",
+      "name": "抑癌与原癌蛋白",
+      "nameEn": "Tumor suppressors & oncoproteins",
+      "description": "p53/RB 等肿瘤调控因子"
+    },
+    {
+      "code": "11.5",
+      "name": "其他细胞周期蛋白",
+      "nameEn": "Other cell cycle",
+      "description": "纺锤体检查点等其他周期蛋白"
+    },
+    {
+      "code": "12.1",
+      "name": "DNA复制机器",
+      "nameEn": "DNA replication",
+      "description": "DNA 聚合酶/MCM/PCNA"
+    },
+    {
+      "code": "12.2",
+      "name": "DNA修复蛋白",
+      "nameEn": "DNA repair",
+      "description": "BRCA/MSH/PARP 等修复因子"
+    },
+    {
+      "code": "12.3",
+      "name": "DEAD-box解旋酶",
+      "nameEn": "DEAD-box helicases",
+      "description": "DDX 家族 ATP 依赖 RNA 解旋酶"
+    },
+    {
+      "code": "12.4",
+      "name": "其他解旋酶",
+      "nameEn": "Other helicases",
+      "description": "RecQ/XP DNA 解旋酶等"
+    },
+    {
+      "code": "12.5",
+      "name": "剪接体",
+      "nameEn": "Spliceosome",
+      "description": "snRNP/剪接因子"
+    },
+    {
+      "code": "12.6",
+      "name": "RNA结合蛋白",
+      "nameEn": "RNA-binding proteins",
+      "description": "RRM/KH 含 RNA 结合蛋白"
+    },
+    {
+      "code": "12.7",
+      "name": "核糖核酸酶",
+      "nameEn": "Ribonucleases",
+      "description": "RNase A/H 家族"
+    },
+    {
+      "code": "12.8",
+      "name": "其他核酸加工",
+      "nameEn": "Other nucleic acid processing",
+      "description": "未归入以上家族的核酸加工蛋白"
+    },
+    {
+      "code": "13.1",
+      "name": "其他膜蛋白",
+      "nameEn": "Other membrane proteins",
+      "description": "跨膜区标注但未归入以上家族"
+    },
+    {
+      "code": "13.2",
+      "name": "未分类蛋白",
+      "nameEn": "Unclassified",
+      "description": "注释信息不足以归入已知家族"
+    }
+  ]
+}

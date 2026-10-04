@@ -1,30 +1,41 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import type { BootstrapDTO, FamilyNodeDTO, OrganismDTO, ProteinLite } from "@/lib/protein-types";
+import type { BootstrapDTO, FamilyNodeDTO, OrganismDTO } from "@/lib/protein-types";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * 引导数据：物种、家族树（含家族×物种计数）、全局统计
+ * 不再返回全量蛋白列表（87k 条过多，蛋白列表走 /api/proteins 分页）
+ */
 export async function GET() {
-  const [organisms, families, proteins] = await Promise.all([
+  const [organisms, families, famOrgCounts, groupStats, seqAgg] = await Promise.all([
     db.organism.findMany({ orderBy: { orderRank: "asc" }, include: { _count: { select: { proteins: true } } } }),
     db.family.findMany({ orderBy: { code: "asc" } }),
-    db.protein.findMany({
-      select: {
-        accession: true,
-        entryName: true,
-        geneName: true,
-        proteinName: true,
-        organism: { select: { taxonId: true } },
-        family: { select: { code: true } },
-        orthologGroup: true,
-        length: true,
-        massKda: true,
-        reviewed: true,
-        isRepresentative: true,
-        pdbCount: true,
-      },
+    db.protein.groupBy({
+      by: ["familyId", "organismId"],
+      _count: { _all: true },
+    }),
+    db.orthologGroup.aggregate({
+      _count: { _all: true },
+      where: {},
+    }),
+    db.protein.aggregate({
+      _avg: { length: true, massKda: true },
+      _count: { _all: true },
     }),
   ]);
+
+  const famById = new Map(families.map((f) => [f.id, f]));
+  const orgById = new Map(organisms.map((o) => [o.id, o]));
+
+  // familyId -> (organismTaxonId -> count)
+  const famOrg = new Map<number, Map<number, number>>();
+  for (const row of famOrgCounts) {
+    if (!famOrg.has(row.familyId)) famOrg.set(row.familyId, new Map());
+    const taxon = orgById.get(row.organismId)?.taxonId ?? 0;
+    famOrg.get(row.familyId)!.set(taxon, (famOrg.get(row.familyId)!.get(taxon) ?? 0) + row._count._all);
+  }
 
   const orgDTOs: OrganismDTO[] = organisms.map((o) => ({
     id: o.id,
@@ -36,34 +47,20 @@ export async function GET() {
     proteinCount: o._count.proteins,
   }));
 
-  const proteinDTOs: ProteinLite[] = proteins.map((p) => ({
-    accession: p.accession,
-    entryName: p.entryName,
-    geneName: p.geneName ?? "",
-    proteinName: p.proteinName,
-    taxonId: p.organism.taxonId,
-    familyCode: p.family.code,
-    group: p.orthologGroup,
-    length: p.length,
-    massKda: p.massKda,
-    reviewed: p.reviewed,
-    rep: p.isRepresentative,
-    pdbCount: p.pdbCount,
-  }));
-
-  // 组装家族树（大类 -> 二级家族）
-  const countByFamily = new Map<string, number>();
-  for (const p of proteinDTOs) countByFamily.set(p.familyCode, (countByFamily.get(p.familyCode) ?? 0) + 1);
-
+  // 组装家族树（大类 -> 家族）
   const famMap = new Map<string, FamilyNodeDTO>();
   for (const f of families) {
+    const byOrg = famOrg.get(f.id) ?? new Map();
+    let count = 0;
+    for (const n of byOrg.values()) count += n;
     famMap.set(f.code, {
       code: f.code,
       name: f.name,
       nameEn: f.nameEn,
       description: f.description ?? "",
-      count: countByFamily.get(f.code) ?? 0,
+      count,
       totalCount: 0,
+      byOrganism: Object.fromEntries(byOrg),
       children: [],
     });
   }
@@ -86,29 +83,31 @@ export async function GET() {
   }
   roots.sort((a, b) => Number(a.code) - Number(b.code));
 
-  const groups = new Set(proteinDTOs.map((p) => p.group));
-  const groupTaxa = new Map<string, Set<number>>();
-  for (const p of proteinDTOs) {
-    if (!groupTaxa.has(p.group)) groupTaxa.set(p.group, new Set());
-    groupTaxa.get(p.group)!.add(p.taxonId);
-  }
-  let multiGroups = 0;
-  for (const taxa of groupTaxa.values()) if (taxa.size >= 2) multiGroups++;
+  // 统计
+  const [crossGroups, ecCount, odbCount, unclassified] = await Promise.all([
+    db.orthologGroup.count({ where: { crossSpecies: true } }),
+    db.protein.count({ where: { NOT: [{ ec: null }, { ec: "" }] } }),
+    db.protein.count({ where: { NOT: [{ orthodb: null }, { orthodb: "" }] } }),
+    db.protein.count({ where: { family: { code: "13.2" } } }),
+  ]);
 
+  const totalProteins = seqAgg._count._all;
   const dto: BootstrapDTO = {
     organisms: orgDTOs,
     families: roots,
-    proteins: proteinDTOs,
     stats: {
-      totalProteins: proteinDTOs.length,
-      reviewed: proteinDTOs.filter((p) => p.reviewed).length,
+      totalProteins,
       classCount: roots.length,
       familyCount: families.filter((f) => f.code.includes(".")).length,
-      groupCount: groups.size,
-      multiSpeciesGroups: multiGroups,
       organismCount: orgDTOs.length,
-      avgLength: Math.round(proteinDTOs.reduce((s, p) => s + p.length, 0) / Math.max(proteinDTOs.length, 1)),
-      avgMass: Math.round((proteinDTOs.reduce((s, p) => s + p.massKda, 0) / Math.max(proteinDTOs.length, 1)) * 10) / 10,
+      orthologGroups: groupStats._count._all,
+      crossSpeciesGroups: crossGroups,
+      ecAnnotated: ecCount,
+      orthodbCovered: odbCount,
+      avgLength: Math.round(seqAgg._avg.length ?? 0),
+      avgMass: Math.round((seqAgg._avg.massKda ?? 0) * 10) / 10,
+      classifiedPct: Math.round(((totalProteins - unclassified) / Math.max(1, totalProteins)) * 1000) / 10,
+      dataDate: "2026-10",
     },
   };
 

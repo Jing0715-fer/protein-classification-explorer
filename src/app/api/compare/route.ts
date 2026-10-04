@@ -5,15 +5,20 @@ import type { CompareDTO, CompareProtein, PairSimilarity } from "@/lib/protein-t
 
 export const dynamic = "force-dynamic";
 
+/**
+ * 跨物种比较（≤12 个蛋白）
+ * GET /api/compare?ids=P04637,P02545,...
+ * 相似度 = 组成余弦 45% + 关键词 Jaccard 40% + 结构域 Jaccard 15%
+ */
 export async function GET(req: NextRequest) {
   const idsParam = req.nextUrl.searchParams.get("ids") ?? "";
   const ids = idsParam
     .split(",")
     .map((s) => s.trim().toUpperCase())
     .filter((s) => /^[A-Z0-9]{6,10}$/.test(s))
-    .slice(0, 8);
+    .slice(0, 12);
   if (ids.length === 0) {
-    return NextResponse.json({ error: "请提供 1-8 个 UniProt 登录号（ids 参数）" }, { status: 400 });
+    return NextResponse.json({ error: "请提供 1-12 个 UniProt 登录号（ids 参数）" }, { status: 400 });
   }
 
   const proteins = await db.protein.findMany({
@@ -33,13 +38,12 @@ export async function GET(req: NextRequest) {
     taxonId: p.organism.taxonId,
     length: p.length,
     massKda: p.massKda,
-    pdbCount: p.pdbCount,
     domainCount: p.domains ? p.domains.split(";").filter((s) => s.trim()).length : 0,
     keywordCount: p.keywords ? p.keywords.split(";").filter((s) => s.trim()).length : 0,
     domains: p.domains ? p.domains.split(";").map((s) => s.trim()).filter(Boolean) : [],
     keywords: p.keywords ? p.keywords.split(";").map((s) => s.trim()).filter(Boolean) : [],
     aaComposition: computeComposition(p.sequence ?? ""),
-    group: p.orthologGroup,
+    group: p.orthodb ?? "",
   }));
 
   // 按输入顺序排序
