@@ -1,11 +1,14 @@
 /**
- * 层级分类引擎 v3：超家族唯一节点 + 全局去重
+ * 层级分类引擎 v4：超家族唯一节点 + 全局去重 + 显示名唯一
  * 层级结构：13 大类 → [超群(group) →] 超家族 → 家族 → 亚家族
- * 核心原则（应用户反馈"家族在多级同时出现、内容不统一"重构）：
+ * 核心原则（应用户反馈"同名家族（如钾离子通道）在多级重复出现"重构）：
  *   1) 每个超家族在整棵树中只出现一次（如 MFS 仅存在于 SLC 超群下，聚合全部物种成员）
  *   2) SLC 超群 = 溶质载体全集：动物按 SLC 编号家族归入 18+1 个超家族分支；
  *      植物/酵母/细菌成员通过 UniProt 官方链家族整体并入对应分支
  *   3) 全局同名节点去重（泛型亚家族标签除外），修复 Rho/Arginase/NIT/激酶亚家族等历史分裂
+ *   4) 【v4】fb 兑底节点并入语义等价链节点（"Potassium channels"→"potassium channel family" 等 11 组）
+ *   5) 【v4】中文名保真翻译：前缀译名 + 限定词保留（"钾离子通道 KCNN 家族"≠"钾离子通道家族"）
+ *   6) 【v4】泛型标签（Type 1/Class A 等）附父节点限定；全局显示名唯一硬校验
  * 输入: download/proteomes/*.jsonl + download/families/*.jsonl
  * 输出: download/hier-families.json + download/hier-classified.jsonl + download/hier-report.json
  * 运行: bun run scripts/classify-hierarchy.ts
@@ -50,6 +53,10 @@ export function parseChain(sim: string): string[] {
           .trim()
       )
       .filter((p) => p.length > 1)
+      // 丢弃 UniProt 链的修饰性伪段（"Belongs to the X family. Highly divergent. {ECO...}."）
+      // —— 它是相似性描述而非真实家族层级，保留会生成 18+ 个同名伪节点
+      // （ECO 移除后可能残留尾部句点，故允许尾部句点/空白）
+      .filter((p) => !/^(highly divergent|divergent)[.\s]*$/i.test(p))
       .flatMap((p) => {
         // 修复 "X superfamily. lowercase-name family" 句点泄漏
         // （如 "ABC transporter superfamily. sn-glycerol-3-phosphate importer family"）
@@ -74,6 +81,11 @@ const CANON_SYNONYMS: [RegExp, string][] = [
   // TC 2.A.2 同家族两种写法：钠:半乳糖同向转运 = GPH 家族
   [/^sodium:galactoside symporter family$/i, "Glycoside-pentoside-hexuronide (GPH) cation symporter family"],
   [/^glycoside-pentoside-hexuronide \(gph\) cation symporter transporter family$/i, "Glycoside-pentoside-hexuronide (GPH) cation symporter family"],
+  // HSP 缩写与全拼归一（"HSP70 family" = "heat shock protein 70 family"）
+  [/^hsp70 family$/i, "heat shock protein 70 family"],
+  [/^hsp90 family$/i, "heat shock protein 90 family"],
+  // 括号变体归一
+  [/^phosphopantetheine phosphatase \(ii\) subfamily$/i, "Phosphopantetheine phosphatase II subfamily"],
 ];
 
 function canonName(seg: string): string {
@@ -95,9 +107,14 @@ function shortName(en: string): string {
     .trim();
 }
 
-/** 归一化 key：短名小写（合并 "X" 与 "X (TC 2.A.1)" 变体） */
+/** 归一化 key：短名 → 小写 → 非字母数字统一为单空格（合并标点/连字符变体，如 "Ntn-hydrolase"="Ntn hydrolase"）
+ * 撇号转 "prime" 防止 "beta'" 与 "beta" 误合 */
 function normKey(en: string): string {
-  return shortName(en).toLowerCase();
+  return shortName(en)
+    .replace(/'/g, " prime")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 // ===== 2) 大类判定（基于链名，回退旧引擎 class） =====
@@ -145,89 +162,220 @@ function classForChain(segs: string[], oldClass: string, hasEC: boolean): string
   return "13";
 }
 
-// ===== 3) 常见超家族/家族中文映射 =====
-const ZH_MAP: [RegExp, string][] = [
-  [/^major facilitator/i, "MFS 主要易化超家族"],
-  [/^atp-binding cassette|^abc transporter/i, "ABC 转运蛋白超家族"],
-  [/^protein kinase/i, "蛋白激酶超家族"],
-  [/^g protein-coupled receptor/i, "G蛋白偶联受体家族"],
-  [/^ionotropic glutamate/i, "离子型谷氨酸受体家族"],
-  [/^nuclear receptor/i, "核受体家族"],
-  [/^zinc finger/i, "锌指转录因子家族"],
-  [/^homeobox/i, "同源框因子家族"],
-  [/^basic leucine zipper|^bzip/i, "bZIP 转录因子家族"],
-  [/^basic helix-loop-helix|^bhlh/i, "bHLH 转录因子家族"],
-  [/^forkhead/i, "Forkhead 转录因子家族"],
-  [/^high mobility group|^hmg/i, "HMG-box 因子家族"],
-  [/^heat shock protein 70/i, "热激蛋白 70 家族"],
-  [/^heat shock protein 90/i, "热激蛋白 90 家族"],
-  [/^chaperonin/i, "伴侣蛋白家族"],
-  [/^small gtpase/i, "小GTP酶超家族"],
-  [/^rab\b|^rab family/i, "RAB 家族"],
-  [/^ras\b|^ras family/i, "RAS 家族"],
-  [/^rho\b|^rho family|^rac\b|^cdc42/i, "RHO 家族"],
-  [/^actin-related|^arp\b/i, "肌动蛋白相关家族"],
-  [/^actin\b/i, "肌动蛋白家族"],
-  [/^tubulin/i, "微管蛋白家族"],
-  [/^myosin/i, "肌球蛋白超家族"],
-  [/^kinesin/i, "驱动蛋白超家族"],
-  [/^dynein/i, "动力蛋白超家族"],
-  [/^histone/i, "组蛋白家族"],
-  [/^ribosomal protein/i, "核糖体蛋白家族"],
-  [/^ubiquitin/i, "泛素家族"],
-  [/^proteasome/i, "蛋白酶体家族"],
-  [/^cytochrome p450/i, "细胞色素 P450 家族"],
-  [/^mitochondrial carrier/i, "线粒体载体家族"],
-  [/^sugar (transporter|porter)/i, "糖转运蛋白家族"],
-  [/^peptide transporter|^proton-dependent oligopeptide/i, "肽转运蛋白家族"],
-  [/^amino acid(-| )permease|amino acid transporter/i, "氨基酸转运蛋白家族"],
-  [/^aquaporin|^major intrinsic/i, "水通道蛋白家族"],
-  [/^sodium:neurotransmitter/i, "钠依赖神经递质转运家族"],
-  [/^sodium-coupled/i, "钠耦联转运家族"],
-  [/^voltage-(dependent|gated)/i, "电压门控离子通道家族"],
-  [/^potassium channel/i, "钾离子通道家族"],
-  [/^sodium channel/i, "钠离子通道家族"],
-  [/^calcium channel/i, "钙离子通道家族"],
-  [/^chloride channel/i, "氯离子通道家族"],
-  [/^cys-loop|^ligand-gated/i, "配体门控离子通道家族"],
-  [/^immunoglobulin/i, "免疫球蛋白超家族"],
-  [/^mhc\b/i, "MHC 家族"],
-  [/^interleukin/i, "白细胞介素家族"],
-  [/^interferon/i, "干扰素家族"],
-  [/^tumor necrosis/i, "TNF 家族"],
-  [/^defensin/i, "防御素家族"],
-  [/^cyclin/i, "周期蛋白家族"],
-  [/^collagen/i, "胶原家族"],
-  [/^fibronectin/i, "纤连蛋白家族"],
-  [/^keratin/i, "角蛋白家族"],
-  [/^globin/i, "珠蛋白家族"],
-  [/^calmodulin|^ef-hand/i, "钙调蛋白/EF-hand 家族"],
-  [/^annexin/i, "膜联蛋白家族"],
-  [/^aldehyde dehydrogenase/i, "醛脱氢酶家族"],
-  [/^short-chain dehydrogenase/i, "短链脱氢酶/还原酶家族"],
-  [/^cytochrome c\b/i, "细胞色素 c 家族"],
-  [/^thioredoxin/i, "硫氧还蛋白家族"],
-  [/^glutathione/i, "谷胱甘肽转移酶家族"],
-  [/^dna polymerase/i, "DNA 聚合酶家族"],
-  [/^rna polymerase/i, "RNA 聚合酶家族"],
-  [/^topoisomerase/i, "拓扑异构酶家族"],
-  [/^elongation factor/i, "延伸因子家族"],
-  [/^olfactory receptor/i, "嗅觉受体家族"],
-  [/^opsin|^rhodopsin/i, "视蛋白家族"],
-  [/^fatty acid/i, "脂肪酸结合蛋白家族"],
-  [/^lipocalin/i, "脂质运载蛋白家族"],
-  [/^serpin/i, "丝氨酸蛋白酶抑制剂家族"],
-  [/^p450\b/i, "细胞色素 P450 家族"],
-  [/^arrestin/i, "阻遏蛋白家族"],
-  [/^syntaxin|^snare/i, "SNARE 家族"],
-  [/^intermediate filament/i, "中间丝家族"],
-  [/^guanine nucleotide/i, "鸟苷酸交换因子家族"],
+// ===== 3) 常见超家族/家族中文映射（保真前缀式 v4） =====
+// 设计目标：不同英文家族名 → 不同中文显示名（消除“钾离子通道家族×4”类碰撞）
+// 结构：前缀译名（不含级别词）+ 尾部 family/subfamily/superfamily 统一翻译 +
+//       限定词保留（"potassium channel KCNN family" → "钾离子通道 KCNN 家族"）
+// 顺序敏感：精确词条在前（如 ^cytochrome c\b 先于 ^cytochrome\b）
+const ZH_PREFIX: [RegExp, string][] = [
+  [/^major facilitator/i, "MFS 主要易化"],
+  [/^atp-binding cassette|^abc transporter/i, "ABC 转运蛋白"],
+  [/^protein kinase/i, "蛋白激酶"],
+  [/^g protein-coupled receptor|^gpcr/i, "G 蛋白偶联受体"],
+  [/^ionotropic glutamate/i, "离子型谷氨酸受体"],
+  [/^nuclear receptor/i, "核受体"],
+  [/^zinc finger/i, "锌指"],
+  [/^homeobox/i, "同源框"],
+  [/^basic leucine zipper|^bzip/i, "bZIP 碱性亮氨酸拉链"],
+  [/^basic helix-loop-helix|^bhlh/i, "bHLH 碱性螺旋-环-螺旋"],
+  [/^forkhead/i, "Forkhead 转录因子"],
+  [/^hmgb\b/i, "HMGB"],
+  [/^hmgn\b/i, "HMGN"],
+  [/^hmga\b/i, "HMGA"],
+  [/^hmg-box|^high mobility group/i, "HMG-box"],
+  [/^heat shock protein 70/i, "热激蛋白 70"],
+  [/^heat shock protein 90/i, "热激蛋白 90"],
+  [/^chaperonin/i, "伴侣蛋白"],
+  [/^small gtpase/i, "小 GTP 酶"],
+  [/^rab family|^rab\b/i, "RAB"],
+  [/^ras family|^ras\b/i, "RAS"],
+  [/^rho family|^rho\b/i, "RHO"],
+  [/^actin-related|^arp\b/i, "ARP 肌动蛋白相关"],
+  [/^actin\b/i, "肌动蛋白"],
+  [/^tubulin/i, "微管蛋白"],
+  [/^myosin/i, "肌球蛋白"],
+  [/^kinesin/i, "驱动蛋白"],
+  [/^dynein/i, "动力蛋白"],
+  [/^histone\b/i, "组蛋白"],
+  [/^ribosomal protein/i, "核糖体蛋白"],
+  [/^ubiquitin/i, "泛素"],
+  [/^proteasome/i, "蛋白酶体"],
+  [/^cytochrome p450|^p450\b/i, "细胞色素 P450"],
+  [/^cytochrome c-type/i, "细胞色素 c 型"],
+  [/^cytochrome c\b/i, "细胞色素 c"],
+  [/^cytochrome\b/i, "细胞色素"],
+  [/^mitochondrial carrier/i, "线粒体载体"],
+  [/^sugar (transporter|porter)/i, "糖转运蛋白"],
+  [/^peptide transporter/i, "肽转运蛋白"],
+  [/^proton-dependent oligopeptide transporter/i, "质子依赖寡肽转运蛋白"],
+  [/^amino acid(-| )permease|^amino acid transporter/i, "氨基酸转运蛋白"],
+  [/^mip\/aquaporin|^aquaporin|^major intrinsic/i, "水通道蛋白"],
+  [/^sodium:neurotransmitter/i, "钠依赖神经递质转运"],
+  [/^sodium-coupled/i, "钠耦联转运"],
+  [/^voltage-(dependent|gated)/i, "电压门控"],
+  [/^potassium channel/i, "钾离子通道"],
+  [/^sodium channel/i, "钠离子通道"],
+  [/^calcium channel/i, "钙离子通道"],
+  [/^chloride channel/i, "氯离子通道"],
+  [/^cys-loop/i, "Cys-loop 配体门控"],
+  [/^ligand-gated ion channel/i, "配体门控离子通道"],
+  [/^ligand-gated/i, "配体门控"],
+  [/^immunoglobulin/i, "免疫球蛋白"],
+  [/^mhc\b/i, "MHC"],
+  [/^interleukin/i, "白细胞介素"],
+  [/^interferon/i, "干扰素"],
+  [/^tumor necrosis factor receptor|^tnf receptor/i, "TNF 受体"],
+  [/^tumor necrosis factor|^tnf\b/i, "TNF"],
+  [/^defensin/i, "防御素"],
+  [/^cyclin-dependent kinase/i, "周期蛋白依赖激酶"],
+  [/^cyclin\b/i, "周期蛋白"],
+  [/^collagen/i, "胶原"],
+  [/^fibronectin/i, "纤连蛋白"],
+  [/^keratin/i, "角蛋白"],
+  [/^globin/i, "珠蛋白"],
+  [/^ef-hand/i, "EF-hand"],
+  [/^calmodulin/i, "钙调蛋白"],
+  [/^annexin/i, "膜联蛋白"],
+  [/^aldehyde dehydrogenase/i, "醛脱氢酶"],
+  [/^short-chain dehydrogenase/i, "短链脱氢酶/还原酶"],
+  [/^thioredoxin/i, "硫氧还蛋白"],
+  [/^glutathione/i, "谷胱甘肽"],
+  [/^dna polymerase/i, "DNA 聚合酶"],
+  [/^rna polymerase/i, "RNA 聚合酶"],
+  [/^topoisomerase/i, "拓扑异构酶"],
+  [/^elongation factor/i, "延伸因子"],
+  [/^olfactory receptor/i, "嗅觉受体"],
+  [/^opsin|^rhodopsin/i, "视蛋白"],
+  [/^fatty acid-binding protein/i, "脂肪酸结合蛋白"],
+  [/^fatty acid\b/i, "脂肪酸"],
+  [/^lipocalin/i, "脂质运载蛋白"],
+  [/^serpin/i, "丝氨酸蛋白酶抑制剂"],
+  [/^arrestin/i, "阻遏蛋白"],
+  [/^syntaxin|^snare/i, "SNARE"],
+  [/^intermediate filament/i, "中间丝"],
+  [/^guanine nucleotide/i, "鸟苷酸交换因子"],
 ];
 
+/** 限定词部分的高置信词级翻译表（仅作用于前缀命中后的残余段） */
+const WORD_ZH: [RegExp, string][] = [
+  [/\blight intermediate chain\b/gi, "轻中间链"],
+  [/\bintermediate chain\b/gi, "中间链"],
+  [/\blight chain\b/gi, "轻链"],
+  [/\bheavy chain\b/gi, "重链"],
+  [/\bsubunit\b/gi, "亚基"],
+  [/\bchain\b/gi, "链"],
+  [/\bsmall\b/gi, "小"],
+  [/\blarge\b/gi, "大"],
+  [/\bauxiliary\b/gi, "辅助"],
+  [/\bregulatory\b/gi, "调节"],
+  [/\bassociated\b/gi, "关联"],
+  [/\bbinding\b/gi, "结合"],
+  [/\bproteins?\b/gi, "蛋白"],
+  [/\breceptors?\b/gi, "受体"],
+  [/\btransporter\b/gi, "转运蛋白"],
+  [/\btransport\b/gi, "转运"],
+  [/\bchannel\b/gi, "通道"],
+  [/\bpermease\b/gi, "通透酶"],
+  [/\bsymporter\b/gi, "同向转运"],
+  [/\bantiporter\b/gi, "反向转运"],
+  [/\bexchanger\b/gi, "交换"],
+  [/\bexporter\b/gi, "外排"],
+  [/\bimporter\b/gi, "输入"],
+  [/\bcarrier\b/gi, "载体"],
+  [/\boxidase\b/gi, "氧化酶"],
+  [/\bperoxidase\b/gi, "过氧化物酶"],
+  [/\breductase\b/gi, "还原酶"],
+  [/\bdehydrogenase\b/gi, "脱氢酶"],
+  [/\bsynthase\b/gi, "合成酶"],
+  [/\bsynthetase\b/gi, "合成酶"],
+  [/\blyase\b/gi, "裂解酶"],
+  [/\bmethyltransferase\b/gi, "甲基转移酶"],
+  [/\btransferase\b/gi, "转移酶"],
+  [/\bdeacetylase\b/gi, "去乙酰化酶"],
+  [/\bphosphatase\b/gi, "磷酸酶"],
+  [/\bkinase\b/gi, "激酶"],
+  [/\bpeptidase\b/gi, "肽酶"],
+  [/\bprotease\b/gi, "蛋白酶"],
+  [/\bdecarboxylase\b/gi, "脱羧酶"],
+  [/\bligase\b/gi, "连接酶"],
+  [/\bconjugating enzyme\b/gi, "结合酶"],
+  [/\bconjugation factor\b/gi, "结合因子"],
+  [/\bactivating\b/gi, "激活"],
+  [/\bactivator\b/gi, "激活因子"],
+  [/\binhibitor\b/gi, "抑制因子"],
+  [/\bfactor\b/gi, "因子"],
+  [/\benzyme\b/gi, "酶"],
+  [/\bpeptide\b/gi, "肽"],
+  [/\bsugar\b/gi, "糖"],
+  [/\blysine\b/gi, "赖氨酸"],
+  [/\btyrosine\b/gi, "酪氨酸"],
+  [/\barginine\b/gi, "精氨酸"],
+  [/\bamino acid\b/gi, "氨基酸"],
+  [/\bacid\b/gi, "酸"],
+  [/\bchloride\b/gi, "氯"],
+  [/\bsodium\b/gi, "钠"],
+  [/\bpotassium\b/gi, "钾"],
+  [/\bcalcium\b/gi, "钙"],
+  [/\bproton\b/gi, "质子"],
+  [/\btype[- ]([A-Z0-9][A-Za-z0-9]*)/gi, "$1 型"], // "type-B"→"B 型"、"type 1"→"1 型"
+  [/\b([A-Za-z0-9]+)-type\b/gi, "$1 型"], // "Tctex-type"→"Tctex 型"
+  [/\bdesaturase\b/gi, "去饱和酶"],
+  [/\blike\b/gi, "样"],
+  [/\bdependent\b/gi, "依赖"],
+  [/\balpha\b/gi, "α"],
+  [/\bbeta\b/gi, "β"],
+  [/\bgamma\b/gi, "γ"],
+  [/\bdelta\b/gi, "δ"],
+  [/\bepsilon\b/gi, "ε"],
+];
+
+/** 短 token 判定：基因符号/编号/罗马数字等直接拼接（"H2A"、"KCNN"、"1"、"II"、"GPR1/git3"） */
+const SHORT_TOKEN_RE = /^[A-Z0-9][A-Za-z0-9\/.-]*(?: [A-Z0-9][A-Za-z0-9\/.-]*)*$/;
+
+/** 拉丁/数字结尾时后接中文需补空格；中文结尾直接拼接 */
+function joinZh(a: string, b: string): string {
+  if (!b) return a;
+  if (/[A-Za-z0-9]$/.test(a) && /^[\u4e00-\u9fff]/.test(b)) return `${a} ${b}`;
+  return `${a}${b}`;
+}
+
+function translateWords(mid: string): string {
+  let s = mid;
+  for (const [re, zh] of WORD_ZH) s = s.replace(re, zh);
+  // 中文间空格收敛
+  return s
+    .replace(/\s+/g, " ")
+    .replace(/([\u4e00-\u9fff])\s+([\u4e00-\u9fff])/g, "$1$2")
+    .trim();
+}
+
+/**
+ * 保真中文译名：前缀译名 + 级别词 + 限定词（半翻译）
+ * - "potassium channel family" → "钾离子通道家族"
+ * - "potassium channel KCNN family" → "钾离子通道 KCNN 家族"
+ * - "histone-lysine methyltransferase family" → "组蛋白 · 赖氨酸甲基转移酶 家族"
+ * - "cytochrome c oxidase subunit 6A family" → "细胞色素 c · 氧化酶亚基 6A 家族"
+ * 无前缀命中 → 返回空（显示英文短名）
+ */
 function zhFor(en: string): string {
-  const lower = en.toLowerCase();
-  for (const [re, zh] of ZH_MAP) {
-    if (re.test(lower)) return zh;
+  const k = shortName(en);
+  for (const [re, zh] of ZH_PREFIX) {
+    const m = re.exec(k);
+    if (!m) continue;
+    const rest = k.slice(m[0].length).trim().replace(/^[-–—:;,.\s]+/, "");
+    const lvlM = rest.match(/\s*(superfamily|subfamily|family)$/i);
+    let mid = rest;
+    let lvlZh = "";
+    if (lvlM) {
+      mid = rest.slice(0, lvlM.index).trim();
+      lvlZh = /superfamily/i.test(lvlM[1]) ? "超家族" : /subfamily/i.test(lvlM[1]) ? "亚家族" : "家族";
+    }
+    if (!mid) return lvlZh ? joinZh(zh, lvlZh) : zh;
+    if (SHORT_TOKEN_RE.test(mid) && mid.length <= 14) {
+      return lvlZh ? `${zh} ${mid} ${lvlZh}` : `${zh} ${mid}`;
+    }
+    const t = translateWords(mid);
+    return lvlZh ? `${zh} · ${joinZh(t, lvlZh)}` : `${zh} · ${t}`;
   }
   return "";
 }
@@ -261,44 +409,45 @@ const SLC_BRANCHES: Record<string, { nameEn: string; name: string }> = {
  * 官方链超家族/家族节点 → SLC 分支拼接映射。
  * 命中的独立节点（含全部子树与跨物种成员）整体并入对应分支，
  * 确保每个超家族在树中只有一个节点。
+ * 注意：正则匹配对象为 normKey（小写、标点/连字符已归一为单空格）
  */
 const SPLICE_TO_BRANCH: { re: RegExp; branch: string }[] = [
   { re: /^major facilitator( superfamily)?$/, branch: "MFS" },
-  { re: /^glycoside-pentoside-hexuronide \(gph\) cation symporter family$/, branch: "MFS" }, // TC 2.A.2（SLC45 所在家族）
+  { re: /^glycoside pentoside hexuronide gph cation symporter family$/, branch: "MFS" }, // TC 2.A.2（SLC45 所在家族）
   { re: /^organo anion transporter family$/, branch: "MFS" }, // SLCO/OATP（TC 2.A.60）
   { re: /^mitochondrial carrier( family)?$/, branch: "MCF" },
-  { re: /^amino acid[-/]polyamine[-/]organocation \(apc\) superfamily$/, branch: "APC" },
-  { re: /^amino acid\/polyamine transporter 2 family$/, branch: "APC" }, // SLC32/36/38 的官方链超家族
+  { re: /^amino acid polyamine organocation apc superfamily$/, branch: "APC" },
+  { re: /^amino acid polyamine transporter 2 family$/, branch: "APC" }, // SLC32/36/38 的官方链超家族
   { re: /^zip transporter family$/, branch: "METAL" }, // SLC39
-  { re: /^cation diffusion facilitator \(cdf\) transporter family$/, branch: "METAL" }, // SLC30
+  { re: /^cation diffusion facilitator cdf transporter family$/, branch: "METAL" }, // SLC30
   { re: /^nramp family$/, branch: "METAL" }, // SLC11
-  { re: /^copper transporter \(ctr\) family$/, branch: "METAL" }, // SLC31
+  { re: /^copper transporter ctr family$/, branch: "METAL" }, // SLC31
   { re: /^membrane magnesium transporter family$/, branch: "METAL" }, // SLC41/MgtE
-  { re: /^nucleotide-sugar transporter family$/, branch: "NST" }, // SLC35
-  { re: /^sodium:neurotransmitter symporter \(snf\) family$/, branch: "NSS" }, // SLC6
-  { re: /^monovalent cation:proton antiporter 1 \(cpa1\) transporter family$/, branch: "CPA1" }, // SLC9
-  { re: /^sodium:solute symporter \(ssf\) family$/, branch: "SSF" }, // SLC5
+  { re: /^nucleotide sugar transporter family$/, branch: "NST" }, // SLC35
+  { re: /^sodium neurotransmitter symporter snf family$/, branch: "NSS" }, // SLC6
+  { re: /^monovalent cation proton antiporter 1 cpa1 transporter family$/, branch: "CPA1" }, // SLC9
+  { re: /^sodium solute symporter ssf family$/, branch: "SSF" }, // SLC5
   { re: /^anion exchanger family$/, branch: "HCO3" }, // SLC4
   { re: /^bicarbonate transporter( family)?$/, branch: "HCO3" }, // SLC4
-  { re: /^dicarboxylate\/amino acid:cation symporter \(daacs\) family$/, branch: "DAACS" }, // SLC1
-  { re: /^slc13a\/dass transporter family$/, branch: "DAACS" }, // SLC13
-  { re: /^ca\(2\+\):cation antiporter \(caca\) family$/, branch: "CACA" }, // SLC8/24
-  { re: /^slc26a\/sulp transporter family$/, branch: "SULP" }, // SLC26
+  { re: /^dicarboxylate amino acid cation symporter daacs family$/, branch: "DAACS" }, // SLC1
+  { re: /^slc13a dass transporter family$/, branch: "DAACS" }, // SLC13
+  { re: /^ca 2 cation antiporter caca family$/, branch: "CACA" }, // SLC8/24
+  { re: /^slc26a sulp transporter family$/, branch: "SULP" }, // SLC26
   { re: /^sulfate permease( family)?$/, branch: "SULP" },
   { re: /^slc12a transporter family$/, branch: "CCC" }, // SLC12
-  { re: /^cation-chloride cotransporter family$/, branch: "CCC" }, // SLC12
-  { re: /^slc29a\/ent transporter family$/, branch: "MFS" }, // SLC29/ENT（ENT 属 MFS）
-  { re: /^concentrative nucleoside transporter \(cnt\) family$/, branch: "NUC" }, // SLC28
-  { re: /^nucleobase:cation symporter-2 \(ncs2\) family$/, branch: "NUC" }, // SLC23
+  { re: /^cation chloride cotransporter family$/, branch: "CCC" }, // SLC12
+  { re: /^slc29a ent transporter family$/, branch: "MFS" }, // SLC29/ENT（ENT 属 MFS）
+  { re: /^concentrative nucleoside transporter cnt family$/, branch: "NUC" }, // SLC28
+  { re: /^nucleobase cation symporter 2 ncs2 family$/, branch: "NUC" }, // SLC23
   { re: /^riboflavin transporter family$/, branch: "NUC" }, // SLC52
-  { re: /^bile acid:sodium symporter \(bass\) family$/, branch: "BASS" }, // SLC10
-  { re: /^inorganic phosphate transporter \(pit\) family$/, branch: "PHOS" }, // SLC20
-  { re: /^sodium-dependent phosphate cotransporter family$/, branch: "PHOS" }, // SLC34
+  { re: /^bile acid sodium symporter bass family$/, branch: "BASS" }, // SLC10
+  { re: /^inorganic phosphate transporter pit family$/, branch: "PHOS" }, // SLC20
+  { re: /^sodium dependent phosphate cotransporter family$/, branch: "PHOS" }, // SLC34
   { re: /^slc34a transporter family$/, branch: "PHOS" }, // SLC34（单段链）
-  { re: /^multi antimicrobial extrusion \(mate\) family$/, branch: "MATE" }, // SLC47
+  { re: /^multi antimicrobial extrusion mate family$/, branch: "MATE" }, // SLC47
   { re: /^sweet sugar transporter family$/, branch: "SWEET" }, // SLC50
-  { re: /^ctl \(choline transporter-like\) family$/, branch: "OTHER" }, // SLC44
-  { re: /^laat-1 family$/, branch: "OTHER" }, // SLC66
+  { re: /^ctl choline transporter like family$/, branch: "OTHER" }, // SLC44
+  { re: /^laat 1 family$/, branch: "OTHER" }, // SLC66
   // 兜底：单段链 "SLCxxA transporter family" 直接并入对应分支（防非 SLC 命名成员残留在外）
 ];
 
@@ -510,16 +659,17 @@ function walkRoots(classRoots: Map<string, Map<string, TreeNode>>, fn: (n: TreeN
 }
 
 // ===== 去重保护名单：这些名称在不同父节点下是【不同】的类别，禁止跨父合并 =====
+// 注意：正则匹配对象为 normKey（小写、标点/连字符已归一为单空格）
 const DENY_MERGE_RE: RegExp[] = [
   // 泛型亚家族标签（含义依赖父节点）
-  /^(type|class|subtype|plant|other) [a-z0-9+-]+(\/[a-z0-9+-]+)?( subfamily)?$/,
+  /^(type|class|subtype|plant|other) [a-z0-9]+( [a-z0-9]+)*( subfamily)?$/,
+  /^(type|class|subtype|plant|other)$/,
   /^highly divergent$/,
   /^(alpha|beta|gamma|delta|epsilon) subunit$/,
   // 同名不同类（真实冲突）
   /^nip subfamily$/, // RING-type NIP ≠ 水通道蛋白 NIP
   /^atl subfamily$/, // RING-type ATL ≠ MGMT ATL
-  /^ski2 subfamily$/, // helicase SKI2 ≠ DExH SKI2
-  /^5-hydroxytryptamine receptor subfamily$/, // GPCR 5-HT ≠ 5-HT3 离子通道
+  /^5 hydroxytryptamine receptor subfamily$/, // GPCR 5-HT ≠ 5-HT3 离子通道
 ];
 
 function denyMerge(nameEn: string): boolean {
@@ -529,7 +679,7 @@ function denyMerge(nameEn: string): boolean {
 
 async function main() {
   const t0 = Date.now();
-  console.log("=== 层级分类引擎 v3（超家族唯一节点 + 全局去重） ===");
+  console.log("=== 层级分类引擎 v4（超家族唯一节点 + 全局去重 + 显示名唯一） ===");
 
   // 1) 读家族链
   const simByAcc = new Map<string, string>();
@@ -829,6 +979,67 @@ async function main() {
     console.log(`手术·组蛋白家族组：收拢 ${movedNodes} 个组蛋白亚型家族`);
   }
 
+  // ===== 手术 3.5：fb 兜底节点并入语义等价链节点（修复"同一家族两个节点"分裂） =====
+  // 旧规则引擎的兜底家族（无链蛋白挂载）与 UniProt 官方链节点（有链蛋白）是同一家族时，
+  // 会生成两个并列节点（如 "Potassium channels" 与 "potassium channel family"）→ 整体并入链节点
+  {
+    const FALLBACK_SPLICE: [RegExp, RegExp][] = [
+      // [fb 兜底节点 nameEn, 目标链节点 nameEn]
+      [/^potassium channels$/i, /^potassium channel family$/i], // 钾离子通道（用户反馈）
+      [/^cytochrome p450$/i, /^cytochrome p450 family$/i],
+      [/^tubulins$/i, /^tubulin family$/i],
+      [/^actins$/i, /^actin family$/i],
+      [/^gpcr$/i, /^g protein-coupled receptor \(gpcr\) superfamily$/i],
+      [/^olfactory receptors$/i, /^g protein-coupled receptor \(gpcr\) superfamily$/i],
+      [/^opsins$/i, /^opsin subfamily$/i],
+      [/^histones$/i, /^histone family group$/i],
+      [/^abc transporters$/i, /^abc transporter superfamily$/i],
+      [/^intermediate filaments$/i, /^intermediate filament family$/i],
+      [/^myosins$/i, /^myosin family$/i],
+      [/^aquaporins$/i, /^mip\/aquaporin family$/i], // 水通道蛋白兜底归并
+    ];
+    const removeFromParent = (node: TreeNode) => {
+      if (node.parentNid !== null) {
+        const parent = nodeById.get(node.parentNid);
+        if (parent) {
+          for (const [pk, pc] of [...parent.children.entries()]) {
+            if (pc === node) { parent.children.delete(pk); break; }
+          }
+        }
+      } else {
+        for (const rc of classRoots.values()) {
+          for (const [pk, pc] of [...rc.entries()]) {
+            if (pc === node) { rc.delete(pk); break; }
+          }
+        }
+      }
+    };
+    let fbMoved = 0;
+    for (const [fbRe, tgtRe] of FALLBACK_SPLICE) {
+      // 找 fb 节点（level2 无父，nameEn 匹配）
+      let fbNode: TreeNode | undefined;
+      walkRoots(classRoots, (n) => {
+        if (!fbNode && n.parentNid === null && fbRe.test(n.nameEn)) fbNode = n;
+      });
+      if (!fbNode) continue;
+      // 找目标链节点（全树搜索 nameEn 匹配，优先同 class）
+      let tgtNode: TreeNode | undefined;
+      walkRoots(classRoots, (n) => {
+        if (!tgtNode && n !== fbNode && tgtRe.test(n.nameEn)) tgtNode = n;
+      });
+      if (!tgtNode) {
+        console.log(`   ⚠ 未找到目标节点: "${fbNode.nameEn}"`);
+        continue;
+      }
+      const n = countTree(fbNode);
+      removeFromParent(fbNode);
+      absorb(tgtNode, fbNode);
+      fbMoved++;
+      console.log(`手术·fb 兜底合并: "${fbNode.nameEn}" (${n}) → "${tgtNode.nameEn}"`);
+    }
+    console.log(`手术·fb 兜底合并：共 ${fbMoved} 组（兜底节点并入官方链节点）`);
+  }
+
   // ===== 手术 4：免疫球蛋白合并 =====
   {
     const t8 = classRoots.get("8")!;
@@ -969,6 +1180,24 @@ async function main() {
     fixLevels(classRoots.get(cls.code), 2);
   }
 
+  // ===== 手术 8：泛型/同名异类标签显示限定（防“同显示名”歧义） =====
+  // Type 1/Class A/Plant/NIP/ATL/5-HT 等相对名或同名异类标签，附父节点限定词，
+  // 使全局显示名唯一（如 "NIP subfamily · MIP/aquaporin" ≠ "NIP subfamily · RING-type zinc finger"）
+  {
+    const stripLevel = (en: string) =>
+      shortName(en).replace(/\s*(family|subfamily|superfamily)$/i, "").trim();
+    let tagged = 0;
+    walkRoots(classRoots, (n) => {
+      if (n.parentNid === null) return;
+      if (!denyMerge(n.nameEn)) return;
+      const parent = nodeById.get(n.parentNid);
+      if (!parent) return;
+      n.name = `${shortName(n.nameEn)} · ${stripLevel(parent.nameEn)}`;
+      tagged++;
+    });
+    console.log(`手术·泛型标签父限定：${tagged} 个相对名节点附父节点限定词`);
+  }
+
   // 5) 编码分配：class 内 level2 按递归总数降序编号，子层同理
   const allNodes: TreeNode[] = [];
   const calcTotal = (n: TreeNode): number => {
@@ -1023,6 +1252,29 @@ async function main() {
       }
     }
     console.log(`校验③ directCount 与蛋白引用一致：${bad} 个不一致（应为 0）`);
+  }
+
+  // 校验④：全局显示名唯一（不同英文家族名 → 不同中文显示名）；撞名时自动附英文原名消歧
+  {
+    const byDisp = new Map<string, TreeNode[]>();
+    walkRoots(classRoots, (n) => {
+      if (!byDisp.has(n.name)) byDisp.set(n.name, []);
+      byDisp.get(n.name)!.push(n);
+    });
+    const dup = [...byDisp.entries()].filter(([, v]) => v.length > 1);
+    console.log(`校验④ 全局显示名唯一：${dup.length} 组撞名（应为 0）`);
+    for (const [k, v] of dup.slice(0, 15)) {
+      console.log(`   ✗ [${k}] ×${v.length}: ${v.map((n) => `${n.code}(${shortName(n.nameEn)})`).join(", ")}`);
+    }
+    // 自动消歧兑底：撞名节点追加英文原名括号
+    let fixed = 0;
+    for (const [, v] of dup) {
+      for (const n of v) {
+        n.name = `${n.name}（${shortName(n.nameEn)}）`;
+        fixed++;
+      }
+    }
+    if (fixed > 0) console.log(`   已自动消歧 ${fixed} 个节点（追加英文原名）`);
   }
 
   // 7) 写蛋白行（familyCode 回填）

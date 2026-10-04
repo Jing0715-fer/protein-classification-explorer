@@ -174,3 +174,28 @@ Stage Summary:
 - 全局去重：非泛型同名节点从 36 组降至 0（4 组保留为真实同名异类：NIP/ATL/SKI2/5-HT 亚家族）
 - 8 个历史分裂家族（Rho/Arginase/NIT/激酶亚家族等）合并；2 处 parseChain 前缀泄漏修复
 - 数据规模：87,728 蛋白 / 10 物种 / 13 大类 / 556 超家族 / 8,073 叶子家族 / 8,749 树节点 / L5 层级 33 个
+
+---
+Task ID: 10
+Agent: Z.ai Code (main)
+Task: 家族名多级重复根治（应用户反馈"钾离子通道/钾离子通道家族出现多次，全面检查其他类似问题"）
+
+Work Log:
+- 深度诊断（临时脚本，已完成清理）：确认两类根因——
+  ①【显示名碰撞·主因】ZH_MAP 前缀模糊匹配丢弃限定词：potassium channel KCNN/KCNE/HCN family 全译成"钾离子通道家族"；GPCR 1/2/T2R/Fz 等 9 家族全译成"G蛋白偶联受体家族"；细胞色素 c×18、周期蛋白×13、组蛋白×11、动力蛋白×7、泛素×6、蛋白酶体×12、DNA 聚合酶×13 等 44 组 232 节点撞名；另发现 4 处翻译错误（glutathione peroxidase→"谷胱甘肽转移酶"、fatty acid desaturase→"脂肪酸结合蛋白"、RAC/CDC42→"RHO 家族"、HMG-CoA 酶→"HMG-box 因子家族"）
+  ②【真实结构重复】fb 兜底节点（无链蛋白）与链节点（有链蛋白）同族分裂：Potassium channels(5.62, 20条) vs potassium channel family(5.7, 150条) 等 12 组；Ntn-hydrolase/Ntn hydrolase（连字符变体）、glycophorin A/A-、HSP70 family/heat shock protein 70 family（缩写变体）、Phosphopantetheine II/(II)（括号变体）漏网；"Highly divergent"×18 为 UniProt 链伪段（ECO 残留句点致过滤失效）
+- classify-hierarchy.ts v4 六项手术：
+  ① ZH_MAP 重构为保真前缀式 ZH_PREFIX（79 词条，主体译名+尾部级别词）+ WORD_ZH 词级翻译表（70 词条，仅作用残余限定段）+ zhFor 重写（短 token 直拼/半翻译/中点分隔三档）+ joinZh 中西文智能空格；修正 4 处翻译错误词条（Rho 精确化、EF-hand/calmodulin 分离、TNF 受体分词条、HMG-CoA 收窄）
+  ② normKey 标点归一（非字母数字→单空格 + beta'→beta prime 防误合）：Ntn/glycophorin/Phosphopantetheine 变体自动合一；SPLICE_TO_BRANCH 38 条正则全部适配新 normKey 格式
+  ③ parseChain 丢弃 "Highly divergent" 伪段（允许 ECO 残留句点）→ 18 个伪节点消失，36 蛋白直挂真实父
+  ④ CANON_SYNONYMS 增补：HSP70/HSP90 缩写归一、括号变体归一
+  ⑤ 手术 3.5 FALLBACK_SPLICE：12 组 fb 兜底节点并入语义等价链节点（钾通道/细胞色素P450/微管蛋白/肌动蛋白/GPCR/嗅觉受体/视蛋白/组蛋白/ABC/中间丝/肌球蛋白/水通道蛋白）
+  ⑥ 手术 8 泛型标签父限定（denyMerge 命中节点 name = 原名 · 父限定，如 "NIP subfamily · MIP/aquaporin" ≠ "NIP subfamily · RING-type zinc finger"）+ 校验④全局显示名唯一（撞名自动附英文原名兜底）
+- 重跑管线 + seed-full 重入库（8,717 树节点/87,728 蛋白/10,501 组）+ dev server 双 fork 守护重启
+- 全面验证：分类引擎四项校验全过（MFS=1/同名残留=0/引用一致=0/显示名撞名=0）；DB 级撞名 0；bootstrap API 树 8,717 节点 dupGroups=0、level2 同级撞名=0、同父撞名=0；Agent Browser：钾通道四家族唯一（钾离子通道家族 170=150链+20fb / KCNN 14 / KCNE 13 / HCN 12）、KCNK10 详情家族链"通道与转运→钾离子通道家族"、GPCR 9 子类唯一、组蛋白 6 亚型唯一、NIP/Type 1 消歧生效、控制台零错误、移动端 390px 无溢出；VLM 视觉审查（浅色+暗色截图）："设计精良、信息架构严谨且极具学术专业感"；lint 零错误；tsc src/ 零错误
+
+Stage Summary:
+- 根治成果：全树 8,717 节点显示名全局唯一（0 撞名），44 组撞名 → 0；每个家族（含 KCNN/KCNE/HCN 等限定词家族、GPCR 各亚类、泛型 Type 1/Class A 标签）在树中可明确区分
+- 12 组同族分裂节点合并（fb 兜底↔官方链）；18 个伪节点清除；4 处翻译错误修正；normKey 标点归一使变体名自动合一
+- 中文名保真升级：主体译名 + 限定词保留 + 词级半翻译（"组蛋白 · 赖氨酸甲基转移酶家族"、"DNA 聚合酶 · B 型家族"、"钠离子通道 · 辅助亚基 SCN1B 家族"）
+- 数据规模：87,728 蛋白 / 10 物种 / 13 大类 / 542 超家族 / 8,058 叶子家族 / 8,717 树节点 / classifiedPct 93.5%
