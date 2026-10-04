@@ -1,9 +1,11 @@
 /**
- * 层级分类引擎 v2：基于 UniProt 官方家族链（cc_similarity "Belongs to..."）
- * 层级结构：13 大类 → 超家族(UniProt链第1段) → 家族(第2段) → 亚家族(第3段)
- * 两遍算法：① 解析链+规则打分 → 按归一化超家族名做多数票统一大类（避免同一超家族分裂）
- *          ② 建树分配编码；无链蛋白回退旧规则引擎家族
- * 节点 key 用归一化名（去 TC/EC 编号括号），避免同家族变体分裂
+ * 层级分类引擎 v3：超家族唯一节点 + 全局去重
+ * 层级结构：13 大类 → [超群(group) →] 超家族 → 家族 → 亚家族
+ * 核心原则（应用户反馈"家族在多级同时出现、内容不统一"重构）：
+ *   1) 每个超家族在整棵树中只出现一次（如 MFS 仅存在于 SLC 超群下，聚合全部物种成员）
+ *   2) SLC 超群 = 溶质载体全集：动物按 SLC 编号家族归入 18+1 个超家族分支；
+ *      植物/酵母/细菌成员通过 UniProt 官方链家族整体并入对应分支
+ *   3) 全局同名节点去重（泛型亚家族标签除外），修复 Rho/Arginase/NIT/激酶亚家族等历史分裂
  * 输入: download/proteomes/*.jsonl + download/families/*.jsonl
  * 输出: download/hier-families.json + download/hier-classified.jsonl + download/hier-report.json
  * 运行: bun run scripts/classify-hierarchy.ts
@@ -31,9 +33,9 @@ export function parseChain(sim: string): string[] {
     .filter(Boolean);
   let best: string[] = [];
   for (const b of blocks) {
-    // 去掉双功能酶的区段前缀："In the N/C-terminal section; belongs to the ..."
+    // 去掉双功能酶的区段前缀："In the N/C-terminal/2nd/3rd section; belongs to the ..."
     const cleaned = b.replace(
-      /In the (?:N|C)-terminal section;\s*belongs to (?:the|a)\s*/gi,
+      /In the [\w-]+(?:-terminal)? section;\s*belongs to (?:the|a)\s*/gi,
       ""
     );
     // 按句点+空格分段（"TC 2.A.1.1" 括号内句点后无空格，不受影响）
@@ -48,6 +50,13 @@ export function parseChain(sim: string): string[] {
           .trim()
       )
       .filter((p) => p.length > 1)
+      .flatMap((p) => {
+        // 修复 "X superfamily. lowercase-name family" 句点泄漏
+        // （如 "ABC transporter superfamily. sn-glycerol-3-phosphate importer family"）
+        const m = p.match(/^(.*(?:superfamily|family))\.\s+([a-z][a-z0-9].*)$/);
+        if (m && m[1].length > 10 && m[2].length > 5) return [m[1], m[2]];
+        return [p];
+      })
       .map((p) => canonName(p));
     if (parts.length > best.length) best = parts;
   }
@@ -60,6 +69,11 @@ const CANON_SYNONYMS: [RegExp, string][] = [
   [/^aquaporin family$/i, "MIP/aquaporin family"],
   [/^major intrinsic protein(?: family)?$/i, "MIP/aquaporin family"],
   [/^immunoglobulin superfamily(?! domain)/i, "immunoglobulin superfamily"],
+  // ABC 转运：旧引擎兜底名 "ABC transporters" 与官方链 "ABC transporter superfamily" 归一
+  [/^abc transporters?$/i, "ABC transporter superfamily"],
+  // TC 2.A.2 同家族两种写法：钠:半乳糖同向转运 = GPH 家族
+  [/^sodium:galactoside symporter family$/i, "Glycoside-pentoside-hexuronide (GPH) cation symporter family"],
+  [/^glycoside-pentoside-hexuronide \(gph\) cation symporter transporter family$/i, "Glycoside-pentoside-hexuronide (GPH) cation symporter family"],
 ];
 
 function canonName(seg: string): string {
@@ -75,6 +89,8 @@ function shortName(en: string): string {
     .replace(/\s*\(TC [^)]*\)/gi, "")
     .replace(/\s*\(EC [0-9.()-]+\)/gi, "")
     .replace(/\.+$/, "")
+    .replace(/\s*(family|superfamily)\s+\1$/i, "$1") // "family family" 泄漏
+    .replace(/\)(family|superfamily)$/i, ") $1") // "(MHS)family" 缺空格泄漏
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -163,7 +179,7 @@ const ZH_MAP: [RegExp, string][] = [
   [/^cytochrome p450/i, "细胞色素 P450 家族"],
   [/^mitochondrial carrier/i, "线粒体载体家族"],
   [/^sugar (transporter|porter)/i, "糖转运蛋白家族"],
-  [/^peptide transporter/i, "肽转运蛋白家族"],
+  [/^peptide transporter|^proton-dependent oligopeptide/i, "肽转运蛋白家族"],
   [/^amino acid(-| )permease|amino acid transporter/i, "氨基酸转运蛋白家族"],
   [/^aquaporin|^major intrinsic/i, "水通道蛋白家族"],
   [/^sodium:neurotransmitter/i, "钠依赖神经递质转运家族"],
@@ -216,33 +232,83 @@ function zhFor(en: string): string {
   return "";
 }
 
-// ===== 4.5) 层级手术：超群/同义合并/误并列修正 =====
+// ===== 4.5) SLC 超群定义 =====
 
-/** SLC 超家族分支（IUPHAR/TC 分类，SLC 超群 → 超家族 → SLC 家族） */
+/** SLC 超家族分支（IUPHAR/TC 分类，SLC 超群 → 超家族分支 → SLC 家族/官方链家族） */
 const SLC_BRANCHES: Record<string, { nameEn: string; name: string }> = {
   MFS:   { nameEn: "Major facilitator superfamily (MFS)", name: "MFS 主要易化超家族" },
-  APC:   { nameEn: "Amino acid/polyamine/organocation (APC) superfamily", name: "APC 氨基酸/多胺/有机阳离子超家族" },
-  DAACS: { nameEn: "Dicarboxylate/amino acid:cation symporter (DAACS)", name: "DAACS 二羧酸/氨基酸阳离子同向转运" },
-  NSS:   { nameEn: "Neurotransmitter:sodium symporter (NSS) family", name: "NSS 神经递质钠同向转运家族" },
-  SSF:   { nameEn: "Solute:sodium symporter (SSF) family", name: "SSF 钠:溶质同向转运家族" },
-  CPA1:  { nameEn: "Monovalent cation:proton antiporter-1 (CPA1)", name: "CPA1 单价阳离子:质子反向转运" },
-  CACA:  { nameEn: "Ca2+/cation antiporter (CaCA) family", name: "CaCA 钙/阳离子反向转运家族" },
-  CCC:   { nameEn: "Cation-chloride cotransporter (CCC) family", name: "CCC 阳离子-氯共转运家族" },
-  SULP:  { nameEn: "Sulfate permease (SulP) family", name: "SulP 硫酸盐通透酶家族" },
-  HCO3:  { nameEn: "Bicarbonate transporter family (SLC4)", name: "SLC4 碳酸氢盐转运体" },
-  BASS:  { nameEn: "Bile acid:sodium symporter (BASS) family", name: "BASS 胆汁酸:钠同向转运家族" },
   MCF:   { nameEn: "Mitochondrial carrier (MCF) family", name: "MCF 线粒体载体超家族" },
-  METAL: { nameEn: "Metal ion transporters (NRAMP/ZnT/ZIP/CTR/FPN/MgtE)", name: "金属离子转运体" },
-  PHOS:  { nameEn: "Na+-phosphate cotransporters (NaPi/PiT)", name: "钠磷共转运 (NaPi/PiT)" },
-  NST:   { nameEn: "Nucleotide-sugar transporter (NST) family", name: "糖核苷酸转运体家族" },
+  APC:   { nameEn: "Amino acid/polyamine/organocation (APC) superfamily", name: "APC 氨基酸/多胺/有机阳离子超家族" },
+  METAL: { nameEn: "Metal ion transporters (NRAMP/ZnT/ZIP/CTR/FPN/MgtE)", name: "金属离子转运体超群" },
+  NST:   { nameEn: "Nucleotide-sugar transporter (NST) family", name: "NST 糖核苷酸转运体家族" },
+  NSS:   { nameEn: "Neurotransmitter:sodium symporter (NSS) family", name: "NSS 神经递质钠同向转运家族" },
+  CPA1:  { nameEn: "Monovalent cation:proton antiporter-1 (CPA1)", name: "CPA1 单价阳离子:质子反向转运" },
+  SSF:   { nameEn: "Solute:sodium symporter (SSF) family", name: "SSF 钠:溶质同向转运家族" },
+  HCO3:  { nameEn: "Bicarbonate transporter family (SLC4)", name: "SLC4 碳酸氢盐转运体" },
+  DAACS: { nameEn: "Dicarboxylate/amino acid:cation symporter (DAACS)", name: "DAACS 二羧酸/氨基酸阳离子同向转运" },
+  CACA:  { nameEn: "Ca2+/cation antiporter (CaCA) family", name: "CaCA 钙/阳离子反向转运家族" },
+  SULP:  { nameEn: "Sulfate permease (SulP) family", name: "SulP 硫酸盐通透酶家族" },
+  CCC:   { nameEn: "Cation-chloride cotransporter (CCC) family", name: "CCC 阳离子-氯共转运家族" },
   NUC:   { nameEn: "Nucleoside & vitamin transporters (CNT/ENT/SVCT/RFVT)", name: "核苷与维生素转运体" },
+  BASS:  { nameEn: "Bile acid:sodium symporter (BASS) family", name: "BASS 胆汁酸:钠同向转运家族" },
+  PHOS:  { nameEn: "Na+-phosphate cotransporters (NaPi/PiT)", name: "钠磷共转运 (NaPi/PiT)" },
   MATE:  { nameEn: "Multidrug and toxic compound extrusion (MATE) family", name: "MATE 多药外排转运体家族" },
+  SWEET: { nameEn: "SWEET sugar transporter family (SLC50)", name: "SWEET 糖外排转运家族 (SLC50)" },
   OTHER: { nameEn: "Other SLC families", name: "其他 SLC 家族" },
 };
 
+/**
+ * 官方链超家族/家族节点 → SLC 分支拼接映射。
+ * 命中的独立节点（含全部子树与跨物种成员）整体并入对应分支，
+ * 确保每个超家族在树中只有一个节点。
+ */
+const SPLICE_TO_BRANCH: { re: RegExp; branch: string }[] = [
+  { re: /^major facilitator( superfamily)?$/, branch: "MFS" },
+  { re: /^glycoside-pentoside-hexuronide \(gph\) cation symporter family$/, branch: "MFS" }, // TC 2.A.2（SLC45 所在家族）
+  { re: /^organo anion transporter family$/, branch: "MFS" }, // SLCO/OATP（TC 2.A.60）
+  { re: /^mitochondrial carrier( family)?$/, branch: "MCF" },
+  { re: /^amino acid[-/]polyamine[-/]organocation \(apc\) superfamily$/, branch: "APC" },
+  { re: /^amino acid\/polyamine transporter 2 family$/, branch: "APC" }, // SLC32/36/38 的官方链超家族
+  { re: /^zip transporter family$/, branch: "METAL" }, // SLC39
+  { re: /^cation diffusion facilitator \(cdf\) transporter family$/, branch: "METAL" }, // SLC30
+  { re: /^nramp family$/, branch: "METAL" }, // SLC11
+  { re: /^copper transporter \(ctr\) family$/, branch: "METAL" }, // SLC31
+  { re: /^membrane magnesium transporter family$/, branch: "METAL" }, // SLC41/MgtE
+  { re: /^nucleotide-sugar transporter family$/, branch: "NST" }, // SLC35
+  { re: /^sodium:neurotransmitter symporter \(snf\) family$/, branch: "NSS" }, // SLC6
+  { re: /^monovalent cation:proton antiporter 1 \(cpa1\) transporter family$/, branch: "CPA1" }, // SLC9
+  { re: /^sodium:solute symporter \(ssf\) family$/, branch: "SSF" }, // SLC5
+  { re: /^anion exchanger family$/, branch: "HCO3" }, // SLC4
+  { re: /^bicarbonate transporter( family)?$/, branch: "HCO3" }, // SLC4
+  { re: /^dicarboxylate\/amino acid:cation symporter \(daacs\) family$/, branch: "DAACS" }, // SLC1
+  { re: /^slc13a\/dass transporter family$/, branch: "DAACS" }, // SLC13
+  { re: /^ca\(2\+\):cation antiporter \(caca\) family$/, branch: "CACA" }, // SLC8/24
+  { re: /^slc26a\/sulp transporter family$/, branch: "SULP" }, // SLC26
+  { re: /^sulfate permease( family)?$/, branch: "SULP" },
+  { re: /^slc12a transporter family$/, branch: "CCC" }, // SLC12
+  { re: /^cation-chloride cotransporter family$/, branch: "CCC" }, // SLC12
+  { re: /^slc29a\/ent transporter family$/, branch: "MFS" }, // SLC29/ENT（ENT 属 MFS）
+  { re: /^concentrative nucleoside transporter \(cnt\) family$/, branch: "NUC" }, // SLC28
+  { re: /^nucleobase:cation symporter-2 \(ncs2\) family$/, branch: "NUC" }, // SLC23
+  { re: /^riboflavin transporter family$/, branch: "NUC" }, // SLC52
+  { re: /^bile acid:sodium symporter \(bass\) family$/, branch: "BASS" }, // SLC10
+  { re: /^inorganic phosphate transporter \(pit\) family$/, branch: "PHOS" }, // SLC20
+  { re: /^sodium-dependent phosphate cotransporter family$/, branch: "PHOS" }, // SLC34
+  { re: /^slc34a transporter family$/, branch: "PHOS" }, // SLC34（单段链）
+  { re: /^multi antimicrobial extrusion \(mate\) family$/, branch: "MATE" }, // SLC47
+  { re: /^sweet sugar transporter family$/, branch: "SWEET" }, // SLC50
+  { re: /^ctl \(choline transporter-like\) family$/, branch: "OTHER" }, // SLC44
+  { re: /^laat-1 family$/, branch: "OTHER" }, // SLC66
+  // 兜底：单段链 "SLCxxA transporter family" 直接并入对应分支（防非 SLC 命名成员残留在外）
+];
+
+/** 链节点名提取 SLC 编号（如 "SLC30A subfamily" → "30"） */
+const SLC_SUBFAM_RE = /^slc-?(\d+)[a-g]? subfamily$/;
+const SLC_CHAINFAM_RE = /^slc-?(\d+)[a-g]? transporter family$/;
+
 /** SLC 家族编号 → (分支, 中文, 别名)；未列编号回退 OTHER + 链/名称推断 */
 const SLC_FAMS: Record<string, { b: string; zh: string; alias: string }> = {
-  SLC1:   { b: "DAACS", zh: "兴奋性氨基酸转运", alias: "EAAT/GLAST" },
+  SLC1:   { b: "DAACS", zh: "兴奋性氨基酸转运", alias: "EAAT" },
   SLC2:   { b: "MFS",   zh: "易化葡萄糖转运", alias: "GLUT" },
   SLC3:   { b: "APC",   zh: "氨基酸转运重链", alias: "rBAT/4F2hc" },
   SLC4:   { b: "HCO3",  zh: "碳酸氢盐/氯交换", alias: "AE" },
@@ -289,49 +355,76 @@ const SLC_FAMS: Record<string, { b: string; zh: string; alias: string }> = {
   SLC47:  { b: "MATE",  zh: "多药及毒性化合物外排", alias: "MATE" },
   SLC48:  { b: "OTHER", zh: "血红素转运", alias: "HRG" },
   SLC49:  { b: "MFS",   zh: "血红素/卟啉外排", alias: "FLVCR" },
-  SLC50:  { b: "MFS",   zh: "核黄素转运", alias: "RFT" },
+  SLC50:  { b: "SWEET", zh: "糖外排转运", alias: "SWEET" },
   SLC51:  { b: "OTHER", zh: "有机溶质 α/β 转运", alias: "OST" },
   SLC52:  { b: "NUC",   zh: "核黄素转运", alias: "RFVT" },
-  SLC66:  { b: "OTHER", zh: "PQ 环重复转运", alias: "PQ-loop" },
-  SLC68:  { b: "MFS",   zh: "MFS 型转运", alias: "" },
+  SLC60:  { b: "MFS",   zh: "MFSD 型糖转运", alias: "" },
+  SLC61:  { b: "MFS",   zh: "MFSD 型转运", alias: "" },
+  SLC66:  { b: "OTHER", zh: "溶酶体氨基酸转运", alias: "LAAT/PQ-loop" },
+  SLC67:  { b: "MFS",   zh: "突触囊泡转运", alias: "SV2" },
+  SLC68:  { b: "MFS",   zh: "MFSD 型转运", alias: "" },
+  SLC71:  { b: "MFS",   zh: "糖转运 (HIAT)", alias: "" },
+  SLC75:  { b: "MFS",   zh: "MFSD 型转运", alias: "" },
   SLCO:   { b: "MFS",   zh: "有机阴离子转运多肽", alias: "OATP" },
 };
 
 interface SlcAssign { branch: string; fam: string; name: string; nameEn: string }
 
+/** SLC 家族展示名：多字母亚族家族（SLC8/9/18/35/51）不带 A 后缀 */
+function slcFamLabel(num: string, isSLCO: boolean): string {
+  if (isSLCO) return "SLCO";
+  if (["8", "9", "18", "35", "51"].includes(num)) return `SLC${num}`;
+  return `SLC${num}A`;
+}
+
 /** 判定 SLC 蛋白：基因名/蛋白名提取编号，映射超家族分支 */
 function slcInfo(gene: string, pname: string, origSuperfamily: string): SlcAssign | null {
   const g = gene.trim();
-  // SLC9 调节相关（NHERF 别名 SLC9A3R1；RSC1A1 名称自带 solute carrier）
-  if (/^NHERF|^RSC1A1/i.test(g)) {
-    return { branch: "OTHER", fam: "SLCREG", name: "SLC 调节相关蛋白 (NHERF/RSC)", nameEn: "SLC regulatory proteins (NHERF/RSC1A1)" };
+  // SLC9 调节相关（NHERF/PDZK1 别名 SLC9A3R1；RSC1A1 名称自带 solute carrier；
+  // SLC2A4RG 等 RG 结尾的是转录调节子而非转运体）
+  if (/^NHERF|^RSC1A1/i.test(g) || /^SLC-?\d+[A-G]?\d*(RG|R\d)$/i.test(g)) {
+    return { branch: "OTHER", fam: "SLCREG", name: "SLC 调节相关蛋白 (NHERF/RSC/SLC 调节子)", nameEn: "SLC regulatory proteins (NHERF/RSC1A1/SLC2A4RG)" };
   }
   let num: string | null = null;
   let isSLCO = false;
   let m = g.match(/^SLCO(\d+)/i);
   if (m) { num = m[1]; isSLCO = true; }
-  else {
+  // OATP 旧命名（如果蝇 Oatp74D）
+  if (!m) { m = g.match(/^OATP/i); if (m) { isSLCO = true; num = ""; } }
+  if (!m) {
     m = g.match(/^SLC-?(\d+)/i);
     if (m) num = m[1];
   }
-  if (!num) {
+  if (!num && !isSLCO) {
     m = pname.match(/[Ss]olute carrier family (\d+)/);
     if (m) num = m[1];
   }
-  if (!num) return null;
-  // 防假阳性（如酵母 SLC1 脂酰转移酶）：要求蛋白名有转运体特征或链指向转运超家族
+  if (num === null && !isSLCO) return null;
+  const numStr = (num ?? "").trim();
+  if (!isSLCO && !numStr) return null;
+  // 防假阳性（如酵母 SLC1 脂酰转移酶）：无字母后缀的基因要求蛋白名有转运体特征或链指向转运超家族；
+  // 带字母后缀的哺乳动物式 SLC 基因（SLC35A4 等，含微蛋白/异构体）直接认可
+  const hasLetterSuffix = /^SLC-?\d+[A-G]/i.test(g) || /^SLCO\d/i.test(g);
   const looksTransporter = /solute carrier|transporter|symporter|antiporter|carrier|permease|exchange|transport/i.test(pname);
   const chainTransport = /major facilitator|carrier|transporter|symporter|antiporter|permease/i.test(origSuperfamily);
-  if (!looksTransporter && !chainTransport) return null;
-  const famKey = isSLCO ? "SLCO" : `SLC${num}`;
+  if (!looksTransporter && !chainTransport && !hasLetterSuffix) return null;
+  const famKey = isSLCO ? "SLCO" : `SLC${numStr}`;
   const def = SLC_FAMS[famKey];
   let branch = def?.b ?? "OTHER";
-  let zh = def?.zh ?? "";
-  let alias = def?.alias ?? "";
+  const zh = def?.zh ?? "";
+  const alias = def?.alias ?? "";
   // 未列编号：链指向 MFS 则归 MFS
   if (!def && /major facilitator|mfs/i.test(origSuperfamily)) branch = "MFS";
-  const name = alias ? `SLC${num}A · ${alias} ${zh}` : zh ? `SLC${num}A · ${zh}` : `SLC${num}A`;
-  const nameEn = isSLCO ? `Organic anion transporter family (SLCO${num})` : `Solute carrier family ${num}${zh ? ` — ${alias || zh}` : ""}`;
+  let name: string;
+  let nameEn: string;
+  if (isSLCO) {
+    name = "SLCO · OATP 有机阴离子转运多肽";
+    nameEn = "Organic anion transporting polypeptide family (SLCO/OATP)";
+  } else {
+    const label = slcFamLabel(numStr, false);
+    name = alias ? `${label} · ${alias} ${zh}` : zh ? `${label} · ${zh}` : label;
+    nameEn = `Solute carrier family ${numStr}${zh ? ` — ${alias || zh}` : ""}`;
+  }
   return { branch, fam: famKey, name, nameEn };
 }
 
@@ -342,19 +435,40 @@ function superfamilyOfChain(segs: string[]): string {
 
 // ===== 4) 树节点构建 =====
 interface TreeNode {
-  key: string; // 层级唯一 key（归一化名拼接）
-  parentKey: string | null;
+  nid: number; // 唯一数字 id（蛋白行的挂载引用，手术中保持稳定）
+  parentNid: number | null;
   nameEn: string; // 官方名（首个出现的原貌）
   name: string; // 中文映射或英文短名
-  level: number; // 2=超家族/单级家族 3=家族 4=亚家族
+  level: number; // 2=超家族/超群 3=超家族分支 4=家族 5=亚家族
   code: string; // 分配后编码 {class}.{i}[.{j}[.{k}]]
-  kind?: "group" | "surgery"; // 手术组节点标记（超群等）
+  kind?: "group" | "surgery"; // 手术组节点标记（超群/超家族分支）
   directCount: number; // 直接挂该节点的蛋白数
   totalCount: number; // 递归总数
-  children: Map<string, TreeNode>;
+  children: Map<string, TreeNode>; // key = normKey(nameEn)
 }
 
-const LEVEL_LABEL = ["", "大类", "超家族", "家族", "亚家族"];
+const LEVEL_LABEL = ["", "大类", "超家族", "家族", "亚家族", "细分"];
+
+let NID = 0;
+const nodeById = new Map<number, TreeNode>();
+
+function newNode(nameEn: string, level: number, parentNid: number | null, name?: string): TreeNode {
+  const nid = ++NID;
+  const zh = name ?? zhFor(nameEn);
+  const node: TreeNode = {
+    nid,
+    parentNid,
+    nameEn: shortName(nameEn),
+    name: zh || shortName(nameEn),
+    level,
+    code: "",
+    directCount: 0,
+    totalCount: 0,
+    children: new Map(),
+  };
+  nodeById.set(nid, node);
+  return node;
+}
 
 /** 递归统计节点全部蛋白数（手术用，未算 totalCount 前） */
 function countTree(n: TreeNode): number {
@@ -368,6 +482,7 @@ function pruneEmpty(children: Map<string, TreeNode>): number {
     removed += pruneEmpty(node.children);
     if (node.directCount <= 0 && node.children.size === 0) {
       children.delete(key);
+      nodeById.delete(node.nid);
       removed++;
     }
   }
@@ -383,24 +498,38 @@ function fixLevels(children: Map<string, TreeNode> | undefined, level: number) {
   }
 }
 
-function newNode(key: string, parentKey: string | null, nameEn: string, level: number): TreeNode {
-  const zh = zhFor(nameEn);
-  return {
-    key,
-    parentKey,
-    nameEn: shortName(nameEn),
-    name: zh || shortName(nameEn),
-    level,
-    code: "",
-    directCount: 0,
-    totalCount: 0,
-    children: new Map(),
+/** 遍历全部节点 */
+function walkRoots(classRoots: Map<string, Map<string, TreeNode>>, fn: (n: TreeNode) => void) {
+  const walk = (children: Map<string, TreeNode>) => {
+    for (const n of children.values()) {
+      fn(n);
+      walk(n.children);
+    }
   };
+  for (const children of classRoots.values()) walk(children);
+}
+
+// ===== 去重保护名单：这些名称在不同父节点下是【不同】的类别，禁止跨父合并 =====
+const DENY_MERGE_RE: RegExp[] = [
+  // 泛型亚家族标签（含义依赖父节点）
+  /^(type|class|subtype|plant|other) [a-z0-9+-]+(\/[a-z0-9+-]+)?( subfamily)?$/,
+  /^highly divergent$/,
+  /^(alpha|beta|gamma|delta|epsilon) subunit$/,
+  // 同名不同类（真实冲突）
+  /^nip subfamily$/, // RING-type NIP ≠ 水通道蛋白 NIP
+  /^atl subfamily$/, // RING-type ATL ≠ MGMT ATL
+  /^ski2 subfamily$/, // helicase SKI2 ≠ DExH SKI2
+  /^5-hydroxytryptamine receptor subfamily$/, // GPCR 5-HT ≠ 5-HT3 离子通道
+];
+
+function denyMerge(nameEn: string): boolean {
+  const k = normKey(nameEn);
+  return DENY_MERGE_RE.some((re) => re.test(k));
 }
 
 async function main() {
   const t0 = Date.now();
-  console.log("=== 层级分类引擎 v2（UniProt 官方链 + 超家族多数票统一） ===");
+  console.log("=== 层级分类引擎 v3（超家族唯一节点 + 全局去重） ===");
 
   // 1) 读家族链
   const simByAcc = new Map<string, string>();
@@ -423,6 +552,7 @@ async function main() {
     segs: string[];
     prelimClass: string;
     oldCode: string;
+    nid: number; // 挂载节点
   }
   const entries: Entry[] = [];
   const voteBySF = new Map<string, Map<string, number>>(); // 归一化超家族名 -> class -> 票数
@@ -441,7 +571,7 @@ async function main() {
       if (segs.length > 0) {
         withChain++;
         const prelim = classForChain(segs, oldClass, p.ecs.length > 0);
-        entries.push({ p, segs, prelimClass: prelim, oldCode: old.code });
+        entries.push({ p, segs, prelimClass: prelim, oldCode: old.code, nid: 0 });
         const sfKey = normKey(segs[0]);
         let votes = voteBySF.get(sfKey);
         if (!votes) {
@@ -450,7 +580,7 @@ async function main() {
         }
         votes.set(prelim, (votes.get(prelim) ?? 0) + 1);
       } else {
-        entries.push({ p, segs: [], prelimClass: oldClass, oldCode: old.code });
+        entries.push({ p, segs: [], prelimClass: oldClass, oldCode: old.code, nid: 0 });
       }
     }
   }
@@ -469,7 +599,6 @@ async function main() {
       }
     }
     classBySF.set(sfKey, best);
-    // 统计被多数票修正的数量（用于报告）
   }
   for (const e of entries) {
     if (e.segs.length > 0) {
@@ -480,19 +609,8 @@ async function main() {
   }
   console.log(`多数票统一超家族 ${classBySF.size} 个（修正 ${unified} 条蛋白的大类归属）`);
 
-  // 4) Pass B：建树（key 用归一化名；兜底蛋白挂旧引擎家族）
+  // 4) Pass B：建树（兜底蛋白挂旧引擎家族）
   const classRoots = new Map<string, Map<string, TreeNode>>();
-  const outLines: string[] = [];
-  const leafByKey = new Map<string, TreeNode>();
-  const report = {
-    total: entries.length,
-    withChain,
-    fallback: entries.length - withChain,
-    unified,
-    byClass: {} as Record<string, number>,
-    levelCounts: {} as Record<string, number>,
-    sampleMFS: [] as string[],
-  };
 
   for (const e of entries) {
     let classCode: string;
@@ -505,18 +623,18 @@ async function main() {
         children = new Map();
         classRoots.set(classCode, children);
       }
-      let parentKey: string | null = null;
+      let parent: TreeNode | null = null;
       let node: TreeNode | null = null;
       for (let i = 0; i < e.segs.length; i++) {
         const nameEn = e.segs[i];
-        const key = (parentKey ?? classCode) + "|" + normKey(nameEn);
+        const key = normKey(nameEn);
         node = children.get(key) ?? null;
         if (!node) {
-          node = newNode(key, parentKey, nameEn, i + 2);
+          node = newNode(nameEn, i + 2, parent ? parent.nid : null);
           children.set(key, node);
         }
         children = node.children;
-        parentKey = key;
+        parent = node;
       }
       leafNode = node!;
     } else {
@@ -530,84 +648,162 @@ async function main() {
         children = new Map();
         classRoots.set(classCode, children);
       }
-      const key = (classCode + "|fb:" + e.oldCode).toLowerCase();
+      const key = "fb:" + e.oldCode.toLowerCase();
       let node = children.get(key);
       if (!node) {
-        node = newNode(key, null, nameEn, 2);
-        if (zh) node.name = zh;
+        node = newNode(nameEn, 2, null, zh || undefined);
         children.set(key, node);
       }
       leafNode = node;
     }
 
     leafNode.directCount++;
-    leafByKey.set(leafNode.key, leafNode);
-    report.byClass[classCode] = (report.byClass[classCode] ?? 0) + 1;
-    outLines.push(JSON.stringify({ ...e.p, _nodeKey: leafNode.key }));
+    e.nid = leafNode.nid;
   }
 
-  // ===== 4.9) 层级手术：超群/同义合并/误并列修正 =====
-  // 手术 1：SLC 超群 —— 溶质载体作为超群，MFS/APC/CPA1 等超家族挂其下，SLC 家族作叶子
+  // ===== 4.9) 手术 1：SLC 超群统一（超家族唯一节点） =====
+  /** 将 src 子树吸收进 dst（计数相加、子级按 normKey 递归并入、蛋白引用重定向） */
+  const absorb = (dst: TreeNode, src: TreeNode) => {
+    dst.directCount += src.directCount;
+    for (const [ck, child] of [...src.children.entries()]) {
+      child.parentNid = dst.nid;
+      const ex = dst.children.get(ck);
+      if (ex) absorb(ex, child);
+      else dst.children.set(ck, child);
+    }
+    for (const e of entries) {
+      if (e.nid === src.nid) e.nid = dst.nid;
+    }
+    nodeById.delete(src.nid);
+  };
   {
     const t5 = classRoots.get("5")!;
-    const slcKey = "5|slc:group";
-    const slcGroup = newNode(slcKey, null, "Solute carrier supergroup (SLC)", 2);
-    slcGroup.name = "溶质载体超群 (SLC)";
+    const slcGroup = newNode("Solute carrier supergroup (SLC)", 2, null, "溶质载体超群 (SLC)");
     slcGroup.kind = "group";
-    t5.set(slcKey, slcGroup);
+    t5.set(normKey(slcGroup.nameEn), slcGroup);
     const branchNodes = new Map<string, TreeNode>();
     for (const [bcode, b] of Object.entries(SLC_BRANCHES)) {
-      const bKey = `${slcKey}|${bcode.toLowerCase()}`;
-      const node = newNode(bKey, slcKey, b.nameEn, 3);
-      node.name = b.name;
+      const node = newNode(b.nameEn, 3, slcGroup.nid, b.name);
       node.kind = "surgery";
-      slcGroup.children.set(bKey, node);
+      slcGroup.children.set(bcode.toLowerCase(), node);
       branchNodes.set(bcode, node);
     }
+
+    // 1a) 动物 SLC 蛋白按编号家族挂入分支（含无链蛋白）
     let moved = 0;
     const branchCount = new Map<string, number>();
-    for (let i = 0; i < entries.length; i++) {
-      const e = entries[i];
+    for (const e of entries) {
       const info = slcInfo(e.p.genePrimary ?? "", e.p.proteinName, superfamilyOfChain(e.segs));
       if (!info) continue;
-      const p = JSON.parse(outLines[i]) as { _nodeKey: string };
-      const oldLeaf = leafByKey.get(p._nodeKey);
+      const oldLeaf = nodeById.get(e.nid);
       if (oldLeaf) oldLeaf.directCount--;
       const branchNode = branchNodes.get(info.branch)!;
-      const famKey = branchNode.key + "|slc:" + info.fam.toLowerCase();
+      const famKey = "slc:" + info.fam.toLowerCase();
       let famNode = branchNode.children.get(famKey);
       if (!famNode) {
-        famNode = newNode(famKey, branchNode.key, info.nameEn, 4);
-        famNode.name = info.name;
+        famNode = newNode(info.nameEn, 4, branchNode.nid, info.name);
         branchNode.children.set(famKey, famNode);
       }
       famNode.directCount++;
-      p._nodeKey = famKey;
-      outLines[i] = JSON.stringify(p);
-      leafByKey.set(famKey, famNode);
+      e.nid = famNode.nid;
       moved++;
       branchCount.set(info.branch, (branchCount.get(info.branch) ?? 0) + 1);
     }
-    console.log(`手术·SLC 超群：迁移 ${moved} 条溶质载体蛋白，分支分布：`);
+    console.log(`手术·SLC 超群①：迁移 ${moved} 条 SLC 编号蛋白，分支分布：`);
     for (const [b, n] of [...branchCount.entries()].sort((x, y) => y[1] - x[1])) {
       console.log(`   ${b}: ${n}`);
     }
+
+    // 1b) 官方链超家族节点整体并入对应分支（全部物种成员 → 每个超家族唯一节点）
+    let spliced = 0;
+    for (const cls of classRoots.keys()) {
+      const children = classRoots.get(cls)!;
+      for (const [key, node] of [...children.entries()]) {
+        if (node === slcGroup) continue;
+        const k = normKey(node.nameEn);
+        const hit = SPLICE_TO_BRANCH.find((s) => s.re.test(k));
+        if (!hit) continue;
+        const branch = branchNodes.get(hit.branch)!;
+        // 整体吸收：直接成员并入分支计数、子树重挂（同名递归吸收）、蛋白引用重定向
+        const directBefore = node.directCount;
+        const childrenBefore = node.children.size;
+        absorb(branch, node);
+        children.delete(key);
+        spliced++;
+        console.log(`   并入 ${hit.branch}: "${node.nameEn}" (直挂 ${directBefore}，子级 ${childrenBefore})`);
+      }
+    }
+    console.log(`手术·SLC 超群②：${spliced} 个官方链超家族节点整体并入对应分支`);
+
+    // 1c) 链式 "SLCxxA subfamily"/"SLCxxA transporter family" 节点吸收进对应 SLC 编号叶
+    //（与 SLC 编号叶同族，避免同分支下两个 SLCxx 节点并存）
+    const collect = (children: Map<string, TreeNode>, out: TreeNode[]) => {
+      for (const n of children.values()) {
+        const k = normKey(n.nameEn);
+        if (SLC_SUBFAM_RE.test(k) || SLC_CHAINFAM_RE.test(k)) out.push(n);
+        collect(n.children, out);
+      }
+    };
+    const chainNodes: TreeNode[] = [];
+    for (const children of classRoots.values()) collect(children, chainNodes);
+    let absorbed = 0;
+    for (const node of chainNodes) {
+      if (!nodeById.has(node.nid)) continue; // 已随其他吸收处理
+      const k = normKey(node.nameEn);
+      const m = k.match(SLC_SUBFAM_RE) ?? k.match(SLC_CHAINFAM_RE);
+      if (!m) continue;
+      const num = m[1];
+      const famKey = `SLC${num}`;
+      const def = SLC_FAMS[famKey];
+      const branch = branchNodes.get(def?.b ?? "OTHER")!;
+      const leafKey = "slc:" + famKey.toLowerCase();
+      let leaf = branch.children.get(leafKey);
+      if (!leaf) {
+        const label = slcFamLabel(num, false);
+        const zh = def?.zh ?? "";
+        const alias = def?.alias ?? "";
+        leaf = newNode(
+          `Solute carrier family ${num}${zh ? ` — ${alias || zh}` : ""}`,
+          4,
+          branch.nid,
+          alias ? `${label} · ${alias} ${zh}` : zh ? `${label} · ${zh}` : label
+        );
+        branch.children.set(leafKey, leaf);
+      }
+      // 从原父节点移除
+      if (node.parentNid !== null) {
+        const parent = nodeById.get(node.parentNid);
+        if (parent) {
+          for (const [pk, pc] of [...parent.children.entries()]) {
+            if (pc === node) { parent.children.delete(pk); break; }
+          }
+        }
+      } else {
+        for (const rc of classRoots.values()) {
+          for (const [pk, pc] of [...rc.entries()]) {
+            if (pc === node) { rc.delete(pk); break; }
+          }
+        }
+      }
+      absorb(leaf, node);
+      absorbed++;
+      console.log(`   吸收 SLC 编号叶: "${node.nameEn}" → ${leaf.name}（+${node.directCount} 直挂）`);
+    }
+    console.log(`手术·SLC 超群③：${absorbed} 个链式 SLC 节点吸收进对应编号叶`);
   }
 
-  // 手术 2：GPCR 超家族分组 —— Class A/B/C/T2R/Fz-Smo 从大类下并列收归 GPCR 超家族下
+  // ===== 4.95) 手术 2：GPCR 超家族分组 =====
   {
     const t3 = classRoots.get("3")!;
-    const gpcrKey = "3|gpcr:group";
-    const gpcr = newNode(gpcrKey, null, "G protein-coupled receptor (GPCR) superfamily", 2);
-    gpcr.name = "G 蛋白偶联受体超家族";
+    const gpcr = newNode("G protein-coupled receptor (GPCR) superfamily", 2, null, "G 蛋白偶联受体超家族");
     gpcr.kind = "group";
-    t3.set(gpcrKey, gpcr);
+    t3.set(normKey(gpcr.nameEn), gpcr);
     let movedNodes = 0;
     for (const [key, node] of [...t3.entries()]) {
       if (node === gpcr) continue;
       if (node.level === 2 && /^g protein-coupled receptor/i.test(node.nameEn)) {
         t3.delete(key);
-        node.parentKey = gpcrKey;
+        node.parentNid = gpcr.nid;
         gpcr.children.set(key, node);
         movedNodes++;
       }
@@ -615,19 +811,17 @@ async function main() {
     console.log(`手术·GPCR 超家族分组：收拢 ${movedNodes} 个受体类节点（Class A/B/C/T2R/Fz-Smo）`);
   }
 
-  // 手术 3：组蛋白家族组 —— H1/H2A/H2B/H3/H4 从并列收归组蛋白组下
+  // ===== 手术 3：组蛋白家族组 =====
   {
     const t4 = classRoots.get("4")!;
-    const histKey = "4|histone:group";
-    const hist = newNode(histKey, null, "Histone family group", 2);
-    hist.name = "组蛋白家族";
+    const hist = newNode("Histone family group", 2, null, "组蛋白家族");
     hist.kind = "group";
-    t4.set(histKey, hist);
+    t4.set(normKey(hist.nameEn), hist);
     let movedNodes = 0;
     for (const [key, node] of [...t4.entries()]) {
       if (node.level === 2 && /^histone h[1-9]/i.test(node.nameEn)) {
         t4.delete(key);
-        node.parentKey = histKey;
+        node.parentNid = hist.nid;
         hist.children.set(key, node);
         movedNodes++;
       }
@@ -635,20 +829,20 @@ async function main() {
     console.log(`手术·组蛋白家族组：收拢 ${movedNodes} 个组蛋白亚型家族`);
   }
 
-  // 手术 4：免疫球蛋白合并 —— Immunoglobulins 兜底节点收归 IgSF 超家族下
+  // ===== 手术 4：免疫球蛋白合并 =====
   {
     const t8 = classRoots.get("8")!;
-    const igKey = "8|immunoglobulin superfamily";
+    const igKey = normKey("immunoglobulin superfamily");
     let igNode = t8.get(igKey);
     if (!igNode) {
-      igNode = newNode(igKey, null, "immunoglobulin superfamily", 2);
+      igNode = newNode("immunoglobulin superfamily", 2, null, "免疫球蛋白超家族 (IgSF)");
       t8.set(igKey, igNode);
     }
     igNode.name = "免疫球蛋白超家族 (IgSF)";
     for (const [key, node] of [...t8.entries()]) {
       if (node !== igNode && node.level === 2 && /^immunoglobulins$/i.test(node.nameEn)) {
         t8.delete(key);
-        node.parentKey = igKey;
+        node.parentNid = igNode.nid;
         node.nameEn = "Immunoglobulin chains & Ig-like receptors";
         node.name = "免疫球蛋白链与 Ig 样受体";
         igNode.children.set(key, node);
@@ -657,7 +851,7 @@ async function main() {
     }
   }
 
-  // 手术 5：生长素响应因子 ARF 迁移 —— 拟南芥 ARF（转录因子）误挂信号类，迁到转录与染色质类
+  // ===== 手术 5：生长素响应因子 ARF 迁移（转录因子误挂信号类） =====
   {
     const t3 = classRoots.get("3")!;
     const t4 = classRoots.get("4")!;
@@ -667,65 +861,104 @@ async function main() {
         t3.delete(key);
         node.nameEn = "Auxin response factor (ARF) family";
         node.name = "生长素响应因子 (ARF) 家族";
-        node.parentKey = null;
+        node.parentNid = null;
         t4.set(key, node);
-        report.byClass["3"] = (report.byClass["3"] ?? 0) - n;
-        report.byClass["4"] = (report.byClass["4"] ?? 0) + n;
         console.log(`手术·生长素 ARF 迁移：${n} 条拟南芥 ARF 转录因子 3 类 → 4 类`);
       }
     }
   }
 
-  // 手术 6：小 G 蛋白兑底分流 —— 基因名 RAB/RAS/RHO/ARF/RAN 等分流到 small GTPase 超家族对应家族
+  // ===== 手术 6：小 G 蛋白兜底分流 =====
   {
     const t3 = classRoots.get("3")!;
     let sgNode: TreeNode | undefined;
     for (const node of t3.values()) {
       if (node.level === 2 && /^small gtpases$/i.test(node.nameEn)) { sgNode = node; break; }
     }
-    const sgsKey = "3|small gtpase superfamily";
+    const sgsKey = normKey("small GTPase superfamily");
     const sgs = t3.get(sgsKey);
     if (sgNode && sgs) {
-      const famByKey = new Map<string, TreeNode>();
-      for (const [k, n] of sgs.children) famByKey.set(normKey(n.nameEn), n);
       const ensureUnderSGS = (nameEn: string, zh: string): TreeNode => {
-        const k = sgsKey + "|" + normKey(nameEn);
+        const k = normKey(nameEn);
         let n = sgs.children.get(k);
         if (!n) {
-          n = newNode(k, sgsKey, nameEn, 3);
-          n.name = zh;
+          n = newNode(nameEn, 3, sgs.nid, zh);
           sgs.children.set(k, n);
         }
         return n;
       };
       let moved = 0;
-      for (let i = 0; i < entries.length; i++) {
-        const p = JSON.parse(outLines[i]) as { _nodeKey: string; genePrimary?: string };
-        if (p._nodeKey !== sgNode.key) continue;
-        const g = (p.genePrimary ?? "").trim();
+      for (const e of entries) {
+        if (e.nid !== sgNode.nid) continue;
+        const g = (e.p.genePrimary ?? "").trim();
         let target: TreeNode | undefined;
-        if (/^RAB/i.test(g)) target = famByKey.get("rab family") ?? ensureUnderSGS("Rab family", "RAB 家族");
-        else if (/^RHO|^RAC|^CDC42|^RND/i.test(g)) target = famByKey.get("rho family") ?? ensureUnderSGS("Rho family", "RHO 家族");
-        else if (/^ARF\d|^ARL\d|^ARFRP|^ARFI/i.test(g)) target = famByKey.get("arf family") ?? ensureUnderSGS("Arf family", "ARF 家族");
-        else if (/^RAN/i.test(g)) target = famByKey.get("ran family") ?? ensureUnderSGS("Ran family", "RAN 家族");
+        if (/^RAB/i.test(g)) target = ensureUnderSGS("Rab family", "RAB 家族");
+        else if (/^RHO|^RAC|^CDC42|^RND/i.test(g)) target = ensureUnderSGS("Rho family", "RHO 家族");
+        else if (/^ARF\d|^ARL\d|^ARFRP|^ARFI/i.test(g)) target = ensureUnderSGS("Arf family", "ARF 家族");
+        else if (/^RAN/i.test(g)) target = ensureUnderSGS("Ran family", "RAN 家族");
         else if (/^RAS|^HRAS|^KRAS|^NRAS|^RAP\d|^RAL|^RIT|^REM|^RHEB|^DIRAS|^ERAS|^RASD|^RASL|^SAR1/i.test(g))
           target = ensureUnderSGS("Other Ras-related GTPases", "其他 Ras 相关小 G 蛋白");
         if (!target) continue;
         target.directCount++;
         sgNode.directCount--;
-        p._nodeKey = target.key;
-        outLines[i] = JSON.stringify(p);
-        leafByKey.set(target.key, target);
+        e.nid = target.nid;
         moved++;
       }
       if (sgNode.directCount <= 0 && sgNode.children.size === 0) {
-        t3.delete(sgNode.key);
+        t3.delete(normKey(sgNode.nameEn));
+        nodeById.delete(sgNode.nid);
       } else {
         sgNode.name = "其他 GTP 结合蛋白";
         sgNode.nameEn = "Other GTP-binding proteins";
       }
-      console.log(`手术·小 G 蛋白兑底分流：${moved} 条按基因名归入对应家族`);
+      console.log(`手术·小 G 蛋白兜底分流：${moved} 条按基因名归入对应家族`);
     }
+  }
+
+  // ===== 手术 7：全局同名家族去重（修复历史分裂的重复节点） =====
+  {
+    // 收集 level>=2 的全部节点，按 normKey 分组
+    const byName = new Map<string, TreeNode[]>();
+    walkRoots(classRoots, (n) => {
+      if (n.level < 2) return;
+      const k = normKey(n.nameEn);
+      if (!byName.has(k)) byName.set(k, []);
+      byName.get(k)!.push(n);
+    });
+    let merged = 0;
+    for (const [k, nodes] of byName) {
+      if (nodes.length < 2) continue;
+      if (denyMerge(nodes[0].nameEn)) continue; // 同名泛型标签：不合并
+      // 目标选择：优先有父节点的（挂在超家族结构下的），其次子树更大
+      const ranked = [...nodes].sort((a, b) => {
+        const ap = a.parentNid !== null ? 0 : 1;
+        const bp = b.parentNid !== null ? 0 : 1;
+        if (ap !== bp) return ap - bp;
+        return countTree(b) - countTree(a);
+      });
+      const target = ranked[0];
+      for (const src of ranked.slice(1)) {
+        const srcParent = src.parentNid !== null ? nodeById.get(src.parentNid) : null;
+        const srcDirect = src.directCount;
+        // 从原父节点移除 src
+        if (srcParent) {
+          for (const [pk, pc] of [...srcParent.children.entries()]) {
+            if (pc === src) { srcParent.children.delete(pk); break; }
+          }
+        } else {
+          for (const rc of classRoots.values()) {
+            for (const [pk, pc] of [...rc.entries()]) {
+              if (pc === src) { rc.delete(pk); break; }
+            }
+          }
+        }
+        // 吸收进 target（计数/子级/蛋白引用全部处理）
+        absorb(target, src);
+        merged++;
+        console.log(`去重·合并 "${k}": "${src.nameEn}" → "${target.nameEn}"（+${srcDirect} 直挂）`);
+      }
+    }
+    console.log(`手术·全局同名去重：合并 ${merged} 个重复节点`);
   }
 
   // 手术后清理：剪空节点 + 重算层级
@@ -758,28 +991,59 @@ async function main() {
     assignCodes(children, cls.code);
   }
 
-  // 6) key -> code 映射，回填蛋白行
-  const codeByKey = new Map(allNodes.map((n) => [n.key, n.code]));
-  const nodeByKey = new Map(allNodes.map((n) => [n.key, n]));
-  for (let i = 0; i < outLines.length; i++) {
-    const p = JSON.parse(outLines[i]);
-    const code = codeByKey.get(p._nodeKey);
-    delete p._nodeKey;
-    outLines[i] = JSON.stringify({ ...p, familyCode: code });
+  // 6) 最终校验：① MFS 唯一 ② 无残留同名节点（除保护名单） ③ directCount 与蛋白引用一致
+  const mfsNodes = allNodes.filter((n) => /^major facilitator/i.test(n.nameEn));
+  console.log(`\n校验① MFS 节点数 = ${mfsNodes.length}（应为 1）`);
+  for (const n of mfsNodes) {
+    console.log(`   ${n.code} ${n.name} total=${n.totalCount} direct=${n.directCount} children=${n.children.size}`);
+  }
+  {
+    const byName = new Map<string, TreeNode[]>();
+    walkRoots(classRoots, (n) => {
+      if (n.level < 2) return;
+      const k = normKey(n.nameEn);
+      if (!byName.has(k)) byName.set(k, []);
+      byName.get(k)!.push(n);
+    });
+    const remaining = [...byName.entries()].filter(([, v]) => v.length > 1 && !denyMerge(v[0].nameEn));
+    console.log(`校验② 残留同名节点组 = ${remaining.length}（应为 0）`);
+    for (const [k, v] of remaining.slice(0, 10)) {
+      console.log(`   ✗ [${k}] ×${v.length}: ${v.map((n) => n.code).join(", ")}`);
+    }
+  }
+  {
+    const refCount = new Map<number, number>();
+    for (const e of entries) refCount.set(e.nid, (refCount.get(e.nid) ?? 0) + 1);
+    let bad = 0;
+    for (const n of allNodes) {
+      const refs = refCount.get(n.nid) ?? 0;
+      if (refs !== n.directCount) {
+        bad++;
+        console.log(`   ✗ 不一致: ${n.code} "${n.nameEn}" directCount=${n.directCount} refs=${refs}`);
+      }
+    }
+    console.log(`校验③ directCount 与蛋白引用一致：${bad} 个不一致（应为 0）`);
   }
 
-  // 7) families.json（level 标注 + 路径描述）
+  // 7) 写蛋白行（familyCode 回填）
+  const outLines = entries.map((e) => {
+    const node = nodeById.get(e.nid);
+    if (!node) throw new Error(`蛋白 ${e.p.accession} 挂载节点丢失`);
+    return JSON.stringify({ ...e.p, familyCode: node.code });
+  });
+
+  // 8) families.json（level 标注 + 路径描述）
   const famRows = allNodes.map((n) => {
     const pathSegs: string[] = [];
     let cur: TreeNode | undefined = n;
-    while (cur && cur.parentKey) {
+    while (cur && cur.parentNid !== null) {
       pathSegs.unshift(cur.nameEn);
-      cur = nodeByKey.get(cur.parentKey);
+      cur = nodeById.get(cur.parentNid);
     }
     const desc =
       pathSegs.length > 1
         ? `UniProt 官方层级: ${pathSegs.join(" → ")}`
-        : `UniProt 官方${LEVEL_LABEL[n.level]}`;
+        : `UniProt 官方${LEVEL_LABEL[n.level] ?? "分类"}`;
     return {
       code: n.code,
       name: n.name,
@@ -794,23 +1058,36 @@ async function main() {
   await Bun.write("download/hier-families.json", JSON.stringify({ classes: CLASSES, families: famRows }, null, 1));
   await Bun.write("download/hier-classified.jsonl", outLines.join("\n") + "\n");
 
-  // 8) 报告
+  // 9) 报告
+  const report = {
+    total: entries.length,
+    withChain,
+    fallback: entries.length - withChain,
+    unified,
+    byClass: {} as Record<string, number>,
+    levelCounts: {} as Record<string, number>,
+    slcGroup: {} as Record<string, number>,
+    dedupRemaining: 0,
+  };
   for (const n of allNodes) {
     const lv = String(n.level);
     report.levelCounts[lv] = (report.levelCounts[lv] ?? 0) + 1;
   }
-  for (const n of allNodes) {
-    if (/^major facilitator/i.test(n.nameEn) || /主要易化/.test(n.name)) {
-      report.sampleMFS.push(`${n.code} ${n.nameEn} (level${n.level}) total=${n.totalCount} direct=${n.directCount} children=${n.children.size}`);
-    }
+  for (const cls of CLASSES) {
+    const children = classRoots.get(cls.code);
+    if (!children) { report.byClass[cls.code] = 0; continue; }
+    report.byClass[cls.code] = [...children.values()].reduce((s, c) => s + countTree(c), 0);
   }
+
   // SLC 超群验证输出
   const slcNode = allNodes.find((n) => n.kind === "group" && /^solute carrier supergroup/i.test(n.nameEn));
   if (slcNode) {
     console.log(`\nSLC 超群验证: ${slcNode.code} ${slcNode.name} total=${slcNode.totalCount}`);
+    report.slcGroup.total = slcNode.totalCount;
     for (const b of [...slcNode.children.values()].sort((a, b) => b.totalCount - a.totalCount)) {
-      console.log(`  ${b.code} ${b.name} — ${b.totalCount} 条，${b.children.size} 个 SLC 家族`);
-      const fams = [...b.children.values()].sort((x, y) => y.totalCount - x.totalCount).slice(0, 5);
+      console.log(`  ${b.code} ${b.name} — ${b.totalCount} 条，${b.children.size} 个家族，直挂 ${b.directCount}`);
+      report.slcGroup[b.name] = b.totalCount;
+      const fams = [...b.children.values()].sort((x, y) => y.totalCount - x.totalCount).slice(0, 6);
       for (const f of fams) console.log(`     · ${f.name} (${f.totalCount})`);
     }
   }
@@ -818,9 +1095,6 @@ async function main() {
   const gpcrNode = allNodes.find((n) => n.kind === "group" && /GPCR/.test(n.nameEn));
   if (gpcrNode) {
     console.log(`\nGPCR 超家族验证: ${gpcrNode.code} ${gpcrNode.name} total=${gpcrNode.totalCount}，子类 ${gpcrNode.children.size} 个`);
-    for (const b of [...gpcrNode.children.values()].sort((a, b) => b.totalCount - a.totalCount)) {
-      console.log(`  ${b.code} ${b.nameEn} — ${b.totalCount}`);
-    }
   }
   await Bun.write("download/hier-report.json", JSON.stringify(report, null, 2));
 
@@ -829,9 +1103,7 @@ async function main() {
     const n = report.byClass[cls.code] ?? 0;
     console.log(`类 ${cls.code} ${cls.name}: ${n} (${((n / entries.length) * 100).toFixed(1)}%)`);
   }
-  console.log(`节点数: level2=${report.levelCounts["2"] ?? 0} level3=${report.levelCounts["3"] ?? 0} level4=${report.levelCounts["4"] ?? 0}`);
-  console.log(`\nMFS 超家族验证（应聚合为单一节点）:`);
-  for (const s of report.sampleMFS) console.log(`  ${s}`);
+  console.log(`节点数: L2=${report.levelCounts["2"] ?? 0} L3=${report.levelCounts["3"] ?? 0} L4=${report.levelCounts["4"] ?? 0} L5=${report.levelCounts["5"] ?? 0}`);
   console.log(`\n=== 完成，耗时 ${((Date.now() - t0) / 1000).toFixed(1)}s ===`);
 }
 

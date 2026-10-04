@@ -149,3 +149,28 @@ Stage Summary:
 - GPCR 超家族 1,926 条收拢 9 子类；组蛋白/IgSF/ARF/小G蛋白/水通道同义合并全部完成
 - UI 从 shadcn 默认风升级为学术期刊风（暖纸配色+衬线标题+等宽数据+细线分隔），VLM 评价"专业感强，非 AI 模板风"
 - 数据规模不变：87,728 蛋白 / 10 物种 / 13 大类 / 574 超家族 / 8,119 叶子家族 / 10,501 直系同源组 / classifiedPct 93.5%
+
+---
+Task ID: 9
+Agent: Z.ai Code (main)
+Task: 分类树全局重构——超家族唯一节点 + 全局去重（应用户反馈"家族在多级同时出现（如 MFS 两处内容不一致），重新梳理所有蛋白分类"）
+
+Work Log:
+- 摸底（scripts/analyze-dupes.ts + scan-slc.ts 新增诊断脚本）：全局 36 组同名节点；根因确认——Task 8 的 SLC 手术只按基因名迁移动物 SLC 蛋白（1,168 条），UniProt 链构建的独立超家族节点保留植物/酵母/细菌成员 → MFS(317+398)/MCF(159+97)/APC(109+60)/ZIP(28+46)/MATE(6+61)/NSS/CPA1/CaCA/SulP/SSF/BASS/NST/PiT/DAACS/SLC29A/SLC34A 等每个超家族被拆成"SLC 分支+独立节点"两半；SLC 组内部 "Solute carrier family 67" 跨 MFS/Other 分支分裂
+- classify-hierarchy.ts 全面重构 v3（nid 数字引用架构替代路径字符串，蛋白挂载引用在手术中恒定）：
+  ① parseChain 修复：区段前缀正则扩展（"In the 2nd/3rd section" 清除 DHOase/MenD 伪节点）、"X superfamily. lowercase-name" 句点泄漏拆分（ABC/sn-glycerol）、"family family"/"(MHS)family" 名称清洗、CANON_SYNONYMS 新增（ABC transporters→ABC transporter superfamily；sodium:galactoside=GPH TC 2.A.2 同族归一）
+  ② SLC 超群手术三步：1a 动物 SLC 编号蛋白按 IUPHAR 分支迁移（1,223 条；SLC_FAMS 补 SLC60/61/66/67/68/71/75+SV2 修正+OATP 旧命名捕获果蝇 Oatp74D；SLC50 从 MFS 改归新建 SWEET 分支——SWEET 非 MFS；字母后缀基因直接认可含微蛋白；SLC2A4RG 等调节子排除入 SLCREG）；1b 官方链超家族节点整体并入对应分支（SPLICE_TO_BRANCH 38 条映射，31 个独立节点吸收，每个超家族全物种成员唯一节点）；1c 链式 "SLCxxA subfamily/transporter family" 节点吸收进对应 SLC 编号叶（20 个，消除同分支 SLC30A 双节点）
+  ③ 手术 7 新增：全局同名家族去重（14 个历史分裂节点合并：Rho/Arginase/RSMC/NIT1-NIT2/METTL21/UbiG/STE20/MAPK/S6K/PIM/Smok/MAPKKK/Class-I/II；DENY_MERGE_RE 保护名单防同名异类误并——NIP/ATL/SKI2/5-HT 受体亚家族等真实同名不同族）
+  ④ 三项自动校验：MFS 节点数=1、非保护同名残留=0、directCount 与蛋白引用一致性=0（每轮运行断言）
+- 数据修正成果：MFS 单节点 740 条 58 家族（拟南芥 166/人 136/小鼠 126/酵母 84/大肠杆菌 74...全 10 物种统一）；MCF 256、APC 236、金属 187、NST 112、MATE 67、NSS 64、CaCA 54、SulP 48、SSF 44、SWEET 23（新增分支）；SLC 超群 2,201 条 19 分支；旧 "Solute carriers (SLC)" 兜底节点清零
+- 重新入库：8,749 家族节点 / 87,728 蛋白 / 10,501 直系同源组；DB 级复核 MFS 唯一+物种分布+重名零
+- dev server 双 fork 守护重启（清 bootstrap 内存缓存）
+- Agent Browser 全链路验证：通道与转运→溶质载体超群 2,201→19 分支（旧独立 MFS/MCF 节点已消失）→MFS 740→58 家族→糖转运家族跨物种表格（酵母 SNF3/MAL11+拟南芥 MSSP1-3/AtTMT+线虫 hmit）→SLC2A·GLUT 叶→P11166 详情四级家族链「通道与转运→SLC 超群→MFS→SLC2A」→进化视角热图含 SLC→⌘K 搜索 SLC2A/MFS→移动端 390px 无横向溢出（scrollWidth=390）；控制台零报错、dev.log 全部 200
+- VLM 视觉审查 3 张截图（树视图/热图/移动端）："设计成熟专业，符合学术期刊数据展示标准"，无布局缺陷
+- lint 零错误；tsc src/ 零错误（仅余 examples/skills 预存无关错误）
+
+Stage Summary:
+- 核心成果：每个超家族在整棵树中只出现一次——动物按 SLC 编号家族归入 19 个超家族分支，植物/酵母/细菌成员通过 UniProt 官方链家族整体并入同一分支，彻底消除"同家族多级重复+内容不统一"
+- 全局去重：非泛型同名节点从 36 组降至 0（4 组保留为真实同名异类：NIP/ATL/SKI2/5-HT 亚家族）
+- 8 个历史分裂家族（Rho/Arginase/NIT/激酶亚家族等）合并；2 处 parseChain 前缀泄漏修复
+- 数据规模：87,728 蛋白 / 10 物种 / 13 大类 / 556 超家族 / 8,073 叶子家族 / 8,749 树节点 / L5 层级 33 个
