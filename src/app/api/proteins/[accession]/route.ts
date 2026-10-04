@@ -239,6 +239,16 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ acc
   const sequence = live?.sequence || protein.sequence || "";
   const familyRow = await db.family.findUnique({ where: { code: classCode } });
 
+  // 完整层级链：大类 → 超家族 → 家族 → 亚家族
+  const segs = familyCode.split(".");
+  const chainCodes: string[] = [];
+  for (let i = 1; i <= segs.length; i++) chainCodes.push(segs.slice(0, i).join("."));
+  const chainRows = await db.family.findMany({ where: { code: { in: chainCodes } } });
+  const familyChain = chainCodes
+    .map((c) => chainRows.find((r) => r.code === c))
+    .filter((r): r is NonNullable<typeof r> => !!r)
+    .map((r) => ({ code: r.code, name: r.name, nameEn: r.nameEn }));
+
   const dto: ProteinDetailDTO = {
     accession: protein.accession,
     entryName: protein.entryName,
@@ -253,6 +263,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ acc
     familyCode,
     familyName: protein.family.name,
     familyNameEn: protein.family.nameEn,
+    familyChain,
     className: familyRow?.name ?? "",
     classNameEn: familyRow?.nameEn ?? "",
     orthodb: protein.orthodb ?? "",

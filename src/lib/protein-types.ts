@@ -27,6 +27,9 @@ export interface FamilyNodeDTO {
 export interface BootstrapStats {
   totalProteins: number;
   classCount: number;
+  /** 超家族节点数（含子节点的 level-2 节点） */
+  superfamilyCount: number;
+  /** 叶子家族数（树末端节点） */
   familyCount: number;
   organismCount: number;
   orthologGroups: number;
@@ -114,6 +117,8 @@ export interface ProteinDetailDTO {
   familyCode: string;
   familyName: string;
   familyNameEn: string;
+  /** 完整层级链：大类 → 超家族 → 家族 → 亚家族 */
+  familyChain?: { code: string; name: string; nameEn: string }[];
   className: string;
   classNameEn: string;
   orthodb: string;

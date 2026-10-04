@@ -299,12 +299,28 @@ export function ProteinDetailSheet({ ctx }: { ctx: ExplorerCtx }) {
                     <span>
                       <span className="text-muted-foreground">分类 </span>
                       <span style={{ color: CLASS_COLORS[classCode] }}>■</span>{" "}
-                      <span className="font-medium">{detail.className}</span>
-                      <span className="text-muted-foreground"> → </span>
-                      <span style={{ color: CLASS_COLORS[classCode] }} className="font-medium">
-                        {detail.familyName}
-                      </span>
-                      <span className="ml-1 text-muted-foreground">({detail.familyNameEn})</span>
+                      {(detail.familyChain?.length ?? 0) > 0
+                        ? detail.familyChain!.map((f, i) => (
+                            <span key={f.code}>
+                              {i > 0 && <span className="text-muted-foreground"> → </span>}
+                              <span
+                                className={i === 0 ? "" : "font-medium"}
+                                style={i === 0 ? { color: CLASS_COLORS[classCode] } : undefined}
+                                title={f.nameEn}
+                              >
+                                {f.name}
+                              </span>
+                            </span>
+                          ))
+                        : (
+                          <>
+                            <span className="font-medium">{detail.className}</span>
+                            <span className="text-muted-foreground"> → </span>
+                            <span style={{ color: CLASS_COLORS[classCode] }} className="font-medium">
+                              {detail.familyName}
+                            </span>
+                          </>
+                        )}
                     </span>
                   </div>
                   {(detail.orthodb || detail.groupName) && (

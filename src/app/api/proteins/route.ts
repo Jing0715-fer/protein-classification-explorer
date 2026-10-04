@@ -22,9 +22,10 @@ export async function GET(req: NextRequest) {
 
   const where: Prisma.ProteinWhereInput = {};
   if (family) {
-    where.family = family.includes(".")
-      ? { code: family }
-      : { code: { startsWith: `${family}.` } };
+    // 多级层级编码：超家族节点（如 "5.2"）同时匹配自身直接蛋白与全部子孙（"5.2.x"）
+    where.family = {
+      OR: [{ code: family }, { code: { startsWith: `${family}.` } }],
+    };
   }
   if (taxon) {
     const taxonId = parseInt(taxon, 10);

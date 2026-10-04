@@ -29,8 +29,8 @@ export function StatsBar({ stats }: { stats: BootstrapStats }) {
     {
       icon: Layers,
       label: "蛋白家族",
-      value: `${stats.familyCount}`,
-      sub: `${stats.classCount} 大类分类体系`,
+      value: `${stats.familyCount.toLocaleString()}`,
+      sub: `${stats.superfamilyCount.toLocaleString()} 超家族 · ${stats.classCount} 大类`,
     },
     {
       icon: GitBranch,

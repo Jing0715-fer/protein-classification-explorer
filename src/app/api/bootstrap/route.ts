@@ -1,14 +1,47 @@
 import { NextResponse } from "next/server";
+import { gzipSync } from "node:zlib";
 import { db } from "@/lib/db";
 import type { BootstrapDTO, FamilyNodeDTO, OrganismDTO } from "@/lib/protein-types";
 
 export const dynamic = "force-dynamic";
 
 /**
- * 引导数据：物种、家族树（含家族×物种计数）、全局统计
- * 不再返回全量蛋白列表（87k 条过多，蛋白列表走 /api/proteins 分页）
+ * 引导数据：物种、家族层级树（大类 → 超家族 → 家族 → 亚家族，UniProt 官方链）、全局统计
+ * 不返回全量蛋白列表（蛋白列表走 /api/proteins 分页）
  */
+
+/** 按编码数字段比较（"5.10" > "5.2"） */
+function compareCode(a: string, b: string): number {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  const len = Math.min(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    if (pa[i] !== pb[i]) return (pa[i] ?? 0) - (pb[i] ?? 0);
+  }
+  return pa.length - pb.length;
+}
+
+/** parentCode: "5.2.1" -> "5.2"；"5" -> null（大类） */
+function parentOf(code: string): string | null {
+  const i = code.lastIndexOf(".");
+  return i < 0 ? null : code.slice(0, i);
+}
+
+// 静态数据内存缓存（数据库重跑 seed 后需重启 dev server 生效）
+let cachedGz: Uint8Array | null = null;
+
+function gzResponse(gz: Uint8Array): NextResponse {
+  return new NextResponse(gz as unknown as BodyInit, {
+    headers: {
+      "Content-Type": "application/json",
+      "Content-Encoding": "gzip",
+      "Content-Length": String(gz.length),
+    },
+  });
+}
+
 export async function GET() {
+  if (cachedGz) return gzResponse(cachedGz);
   const [organisms, families, famOrgCounts, groupStats, seqAgg] = await Promise.all([
     db.organism.findMany({ orderBy: { orderRank: "asc" }, include: { _count: { select: { proteins: true } } } }),
     db.family.findMany({ orderBy: { code: "asc" } }),
@@ -29,7 +62,7 @@ export async function GET() {
   const famById = new Map(families.map((f) => [f.id, f]));
   const orgById = new Map(organisms.map((o) => [o.id, o]));
 
-  // familyId -> (organismTaxonId -> count)
+  // familyId -> (taxonId -> count)
   const famOrg = new Map<number, Map<number, number>>();
   for (const row of famOrgCounts) {
     if (!famOrg.has(row.familyId)) famOrg.set(row.familyId, new Map());
@@ -47,58 +80,108 @@ export async function GET() {
     proteinCount: o._count.proteins,
   }));
 
-  // 组装家族树（大类 -> 家族）
-  const famMap = new Map<string, FamilyNodeDTO>();
+  // 1) 全部节点（直接计数）——载荷优化：description 不传（前端按路径拼），nameEn 仅在与 name 不同时传
+  const nodeMap = new Map<string, FamilyNodeDTO & { _children: (FamilyNodeDTO & { _children: unknown[] })[] }>();
   for (const f of families) {
     const byOrg = famOrg.get(f.id) ?? new Map();
     let count = 0;
     for (const n of byOrg.values()) count += n;
-    famMap.set(f.code, {
+    const name = f.name || f.nameEn;
+    nodeMap.set(f.code, {
       code: f.code,
-      name: f.name,
-      nameEn: f.nameEn,
-      description: f.description ?? "",
+      name,
+      nameEn: f.nameEn && f.nameEn !== name ? f.nameEn : "",
+      description: "",
       count,
       totalCount: 0,
       byOrganism: Object.fromEntries(byOrg),
       children: [],
+      _children: [],
     });
   }
+
+  // 2) 组树：parent = 去掉最后一段
   const roots: FamilyNodeDTO[] = [];
   for (const f of families) {
-    const node = famMap.get(f.code)!;
-    if (f.code.includes(".")) {
-      const parentCode = f.code.split(".")[0];
-      const parent = famMap.get(parentCode);
+    const node = nodeMap.get(f.code)!;
+    const pCode = parentOf(f.code);
+    if (pCode) {
+      const parent = nodeMap.get(pCode);
       if (parent) {
-        parent.children!.push(node);
+        (parent.children as (FamilyNodeDTO & { _children: unknown[] })[]).push(node);
         continue;
       }
     }
     roots.push(node);
   }
-  for (const node of roots) {
-    node.totalCount = node.count + node.children!.reduce((s, c) => s + c.count, 0);
-    node.children!.sort((a, b) => Number(a.code.split(".")[1]) - Number(b.code.split(".")[1]));
+
+  // 3) 递归聚合 totalCount / byOrganism（自底向上：先深后浅——树很深，用递归函数）
+  const aggregate = (node: FamilyNodeDTO & { _children: unknown[] }): { total: number; byOrg: Record<number, number> } => {
+    let total = node.count;
+    const byOrg: Record<number, number> = { ...node.byOrganism };
+    for (const child of node.children as (FamilyNodeDTO & { _children: unknown[] })[]) {
+      const r = aggregate(child);
+      total += r.total;
+      for (const [t, n] of Object.entries(r.byOrg)) {
+        byOrg[Number(t)] = (byOrg[Number(t)] ?? 0) + n;
+      }
+    }
+    node.totalCount = total;
+    node.byOrganism = byOrg;
+    return { total, byOrg };
+  };
+  for (const r of roots) {
+    const node = r as FamilyNodeDTO & { _children: unknown[] };
+    aggregate(node);
+    // 4) 子节点按 totalCount 降序（编码即按数量分配，此处再按实际数量稳定排序）
+    const sortChildren = (n: FamilyNodeDTO) => {
+      (n.children ?? []).sort((a, b) => b.totalCount - a.totalCount || compareCode(a.code, b.code));
+      for (const c of n.children ?? []) sortChildren(c);
+    };
+    sortChildren(node);
   }
-  roots.sort((a, b) => Number(a.code) - Number(b.code));
+  roots.sort((a, b) => compareCode(a.code, b.code));
+
+  // 清理内部字段
+  const clean = (n: FamilyNodeDTO) => {
+    delete (n as { _children?: unknown[] })._children;
+    for (const c of n.children ?? []) clean(c);
+  };
+  for (const r of roots) clean(r);
 
   // 统计
+  const unclassifiedFam = await db.family.findFirst({ where: { name: "未分类蛋白" } });
   const [crossGroups, ecCount, odbCount, unclassified] = await Promise.all([
     db.orthologGroup.count({ where: { crossSpecies: true } }),
     db.protein.count({ where: { NOT: [{ ec: null }, { ec: "" }] } }),
     db.protein.count({ where: { NOT: [{ orthodb: null }, { orthodb: "" }] } }),
-    db.protein.count({ where: { family: { code: "13.2" } } }),
+    unclassifiedFam
+      ? db.protein.count({ where: { family: { code: unclassifiedFam.code } } })
+      : Promise.resolve(0),
   ]);
 
   const totalProteins = seqAgg._count._all;
+  // 层级统计：level2 含超家族+单级家族；叶子 = 家族树末端节点
+  const superfamilyCount = families.filter((f) => {
+    const code = f.code;
+    const segs = code.split(".").length;
+    if (segs !== 2) return false;
+    return families.some((x) => parentOf(x.code) === code);
+  }).length;
+  const familyCount = families.filter((f) => {
+    const segs = f.code.split(".").length;
+    if (segs < 2) return false;
+    return !families.some((x) => parentOf(x.code) === f.code);
+  }).length;
+
   const dto: BootstrapDTO = {
     organisms: orgDTOs,
     families: roots,
     stats: {
       totalProteins,
       classCount: roots.length,
-      familyCount: families.filter((f) => f.code.includes(".")).length,
+      superfamilyCount,
+      familyCount,
       organismCount: orgDTOs.length,
       orthologGroups: groupStats._count._all,
       crossSpeciesGroups: crossGroups,
@@ -111,5 +194,7 @@ export async function GET() {
     },
   };
 
-  return NextResponse.json(dto);
+  // gzip 压缩（全层级树 JSON 1.8MB+，压缩后 ~150KB）+ 内存缓存
+  cachedGz = new Uint8Array(gzipSync(JSON.stringify(dto), { level: 4 }));
+  return gzResponse(cachedGz);
 }

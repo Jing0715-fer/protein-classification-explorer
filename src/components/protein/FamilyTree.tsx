@@ -43,10 +43,11 @@ function OrgStackBar({ byOrganism, active }: { byOrganism: Record<number, number
 }
 
 export function FamilyTree({ nodes, selected, onSelect, level = 0 }: TreeProps) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // 大树（数千节点）：默认全部折叠，仅渲染展开路径
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const toggle = (code: string) => {
-    setCollapsed((prev) => {
+    setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(code)) next.delete(code);
       else next.add(code);
@@ -57,22 +58,29 @@ export function FamilyTree({ nodes, selected, onSelect, level = 0 }: TreeProps) 
   return (
     <div className="space-y-0.5" role="tree" aria-label="蛋白家族分类树">
       {nodes.map((node) => {
-        const isClass = !node.code.includes(".");
-        const color = CLASS_COLORS[node.code] ?? "#64748b";
+        const segs = node.code.split(".").length; // 1=大类 2=超家族 3=家族 4=亚家族
+        const isClass = segs === 1;
+        const isSuperfamily = segs === 2;
+        const color = CLASS_COLORS[node.code.split(".")[0]] ?? "#64748b";
         const isSelected = selected === node.code;
-        const isCollapsed = collapsed.has(node.code);
+        const isCollapsed = !expanded.has(node.code);
         const hasChildren = (node.children?.length ?? 0) > 0;
 
         return (
           <div key={node.code} role="treeitem" aria-expanded={hasChildren ? !isCollapsed : undefined} aria-selected={isSelected}>
             <div
-              className={`group/tree flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-1.5 text-sm transition-colors ${
+              className={`group/tree flex cursor-pointer items-center gap-1 rounded-md px-1.5 py-1.5 transition-colors ${
                 isSelected
                   ? "bg-emerald-50 font-medium text-emerald-800 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-900"
                   : "hover:bg-accent"
               }`}
               style={{ paddingLeft: `${level * 14 + 6}px` }}
-              onClick={() => onSelect(node.code)}
+              onClick={() => {
+                onSelect(node.code);
+                // 选中时自动展开（折叠走箭头按钮）
+                if (hasChildren && !expanded.has(node.code)) toggle(node.code);
+              }}
+              title={`${node.name}${node.nameEn ? ` · ${node.nameEn}` : ""}${(node.children?.length ?? 0) > 0 ? `\n含子级共 ${node.totalCount.toLocaleString()} 条蛋白` : `\n${node.count.toLocaleString()} 条蛋白`}`}
             >
               {hasChildren ? (
                 <button
@@ -90,13 +98,25 @@ export function FamilyTree({ nodes, selected, onSelect, level = 0 }: TreeProps) 
               )}
 
               <span
-                className="h-2 w-2 shrink-0 rounded-full"
-                style={{ backgroundColor: color }}
+                className={`${isClass ? "h-2 w-2" : isSuperfamily ? "h-2 w-2" : "h-1.5 w-1.5"} shrink-0 rounded-full ${isSuperfamily ? "ring-2 ring-offset-1 ring-offset-card" : ""}`}
+                style={{ backgroundColor: color, ...(isSuperfamily ? { boxShadow: `0 0 0 1px ${color}` } : {}) }}
                 aria-hidden
               />
-              <span className={`truncate ${isClass ? "font-semibold" : ""}`}>{node.name}</span>
+              <span
+                className={`truncate ${
+                  isClass
+                    ? "font-semibold"
+                    : isSuperfamily
+                      ? "font-medium"
+                      : segs >= 4
+                        ? "text-[13px] text-muted-foreground"
+                        : ""
+                }`}
+              >
+                {node.name}
+              </span>
 
-              {/* 家族行：物种构成迷你堆叠条 */}
+              {/* 超家族/家族行：物种构成迷你堆叠条 */}
               {!isClass && <OrgStackBar byOrganism={node.byOrganism} active={isSelected} />}
 
               <span
@@ -105,8 +125,9 @@ export function FamilyTree({ nodes, selected, onSelect, level = 0 }: TreeProps) 
                     ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300"
                     : "bg-muted text-muted-foreground"
                 }`}
+                title={hasChildren ? `含子级共 ${node.totalCount.toLocaleString()} 条（直接挂载 ${node.count.toLocaleString()}）` : `${node.count.toLocaleString()} 条`}
               >
-                {isClass ? node.totalCount.toLocaleString() : node.count.toLocaleString()}
+                {(hasChildren ? node.totalCount : node.count).toLocaleString()}
               </span>
             </div>
 

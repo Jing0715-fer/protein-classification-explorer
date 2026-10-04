@@ -108,3 +108,24 @@ Stage Summary:
 - 13 大类 116 家族分类体系，87.6% 归入具名家族；10,501 个真实 OrthoDB 直系同源组支撑跨物种比较
 - 详情页实时对接 UniProt API（首次 ~2s，缓存后毫秒级），功能/GO/关键词/PDB/PTM/结构域位置全量呈现
 - 仓库推送：Jing0715-fer/protein-classification-explorer（含 92MB 数据库快照，clone 配置 .env 即可运行；原始数据可用 scripts/fetch-proteomes.ts + classify.ts + seed-full.ts 重新生成）
+
+---
+Task ID: 7
+Agent: Z.ai Code (main)
+Task: 家族分类层级化升级——UniProt 官方超家族→家族→亚家族链（应用户反馈"slc家族拟南芥只有4个？超家族需要下一级家族分类"）
+
+Work Log:
+- 根因定位：旧分类引擎是关键词规则（5.5 规则 /solute carrier|^slc/），拟南芥蛋白名不带 SLC 字样 → 仅 4 条误归；且只有 大类→家族 两级，无超家族层级
+- 数据验证：UniProt cc_similarity 字段即官方层级链（"Belongs to the major facilitator superfamily. Sugar transporter (TC 2.A.1.1) family. Glucose transporter subfamily."）；拟南芥 MFS reviewed 全量 158 条、Sugar transporter 85 条（API curl 验证）
+- scripts/fetch-families.ts：轻量补抓 10 物种全量 87,728 条 accession+cc_similarity（6.1 分钟，双 fork 守护进程防沙箱清理）
+- scripts/classify-hierarchy.ts 两遍算法：①parseChain 解析官方链（句点分段/去 ECO/TC 括号归一化）+ 规则打分 → 按归一化超家族名做多数票统一大类（修正 5,171 条，避免同一超家族分裂到多个大类）②建树分配编码 {class}.{sf}.{fam}.{sub}；无链蛋白（25.3%）回退旧规则引擎家族
+- 覆盖率：官方链 74.7%（65,536 条），加上兜底具名家族 classifiedPct 93.5%；节点数 level2=6,774 / level3=1,753 / level4=377
+- seed-full.ts 重入库：8,917 家族节点（13 大类 + 8,904 层级节点）
+- API 层：bootstrap 改任意深度组树（parentOf 去尾段）+ 递归聚合 totalCount/byOrganism + gzip 压缩（1.87MB→163KB）+ 内存缓存（首次 6.5s → 8ms）；proteins/groups 家族过滤改 OR(精确+前缀) 支持超家族节点聚合子孙；详情 API 新增 familyChain 完整层级链
+- 前端：FamilyTree 深度区分样式（大类/超家族 ring/亚家族淡色）+ 默认折叠 + 选中自动展开；FamilyTreeView 递归 flattenFamilies/findFamilyPath + 四级面包屑（可点击跳转）+ 渲染期间重置页码（替代 key 重挂载，保留树展开状态）；ProteinDetailSheet 显示完整层级链；PhyloView 热图改"每大类 Top 12 超家族"模式（含子级徽标）；StatsBar/页脚/⌘K 文案加超家族统计
+- 修复：Prisma StringFilter 不支持内联 OR（groups route 提升到 where.AND）；bootstrap 未分类统计前缀 bug；Turbopack 缓存损坏（删 .next 重启）
+
+Stage Summary:
+- 层级体系从"13 大类 116 人工家族"升级为"13 大类 → 605 超家族 → 8,213 叶子家族"（UniProt 官方链）
+- 核心验证：MFS 主要易化超家族(5.1) 全物种 627 条 / 拟南芥 158 条（=官方 reviewed 全量，旧版仅 4 条）；下含 39 个家族（糖转运 146/POT 77/有机阳离子 72...）；GLUT1(P11166) 完整四级链"通道与转运 → MFS → 糖转运家族 → Glucose transporter subfamily"
+- Agent Browser 全流程通过：四级树导航/面包屑跳转/拟南芥筛选/热图 Top12 跳转/GLUT4 组比较 7 物种出图/移动端 390px 无溢出/控制台零报错；VLM 视觉审查 4 张截图无布局问题

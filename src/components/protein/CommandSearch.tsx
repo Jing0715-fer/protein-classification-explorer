@@ -40,13 +40,16 @@ export function CommandSearch({
   const searching = searchQuery.isFetching && debounced.trim().length >= 2;
   const hasQuery = debounced.trim().length >= 2;
 
-  // 家族计数（服务端 search 不返回计数，从 bootstrap 树查询）
+  // 家族计数（服务端 search 不返回计数，从 bootstrap 树递归查询）
   const famCountByCode = useMemo(() => {
     const m = new Map<string, number>();
-    for (const c of data.families) {
-      m.set(c.code, c.totalCount);
-      for (const f of c.children ?? []) m.set(f.code, f.count);
-    }
+    const walk = (nodes: typeof data.families) => {
+      for (const n of nodes) {
+        m.set(n.code, (n.children?.length ?? 0) > 0 ? n.totalCount : n.count);
+        if (n.children?.length) walk(n.children);
+      }
+    };
+    walk(data.families);
     return m;
   }, [data]);
 
@@ -76,7 +79,7 @@ export function CommandSearch({
             <SearchIcon className="h-6 w-6 opacity-40" />
             <p className="text-xs">输入至少 2 个字符，在全量蛋白组中搜索</p>
             <p className="text-[10px]">
-              {data.stats.totalProteins.toLocaleString()} 条蛋白 · {data.stats.familyCount} 个家族 ·{" "}
+              {data.stats.totalProteins.toLocaleString()} 条蛋白 · {data.stats.superfamilyCount.toLocaleString()} 超家族 · {data.stats.familyCount.toLocaleString()} 叶子家族 ·{" "}
               {data.stats.organismCount} 种模式生物
             </p>
           </div>

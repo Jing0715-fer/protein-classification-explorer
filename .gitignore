@@ -60,3 +60,8 @@ download/*.log
 download/fetch-proteomes.log
 agent-ctx/
 tool-results/
+# 层级分类原始数据（大文件，可由 scripts 重新生成）
+download/families/
+download/hier-classified.jsonl
+download/hier-families.json
+download/hier-report.json

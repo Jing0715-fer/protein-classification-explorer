@@ -210,9 +210,7 @@ export function ProteinExplorer() {
           {data && ctx && (
             <div className="space-y-5">
               <StatsBar stats={data.stats} />
-              {view === "tree" && (
-                <FamilyTreeView key={`${familyCode ?? "all"}|${taxonFilter ?? "all"}`} ctx={ctx} />
-              )}
+              {view === "tree" && <FamilyTreeView ctx={ctx} />}
               {view === "phylo" && <PhyloView ctx={ctx} />}
               {view === "compare" && <CompareView ctx={ctx} />}
             </div>
@@ -236,8 +234,8 @@ export function ProteinExplorer() {
               {stats ? (
                 <>
                   <span className="mx-1.5 text-border">·</span>
-                  {stats.totalProteins.toLocaleString()} 条 · {stats.organismCount} 物种 · {stats.familyCount} 家族 ·{" "}
-                  {stats.orthologGroups.toLocaleString()} 直系同源组
+                  {stats.totalProteins.toLocaleString()} 条 · {stats.organismCount} 物种 · {stats.superfamilyCount.toLocaleString()} 超家族 ·{" "}
+                  {stats.familyCount.toLocaleString()} 家族 · {stats.orthologGroups.toLocaleString()} 直系同源组
                 </>
               ) : null}
             </p>

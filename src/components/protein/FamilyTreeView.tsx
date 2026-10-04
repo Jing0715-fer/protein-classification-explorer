@@ -4,7 +4,7 @@ import type { ExplorerCtx } from "./ProteinExplorer";
 import { FamilyTree } from "./FamilyTree";
 import type { FamilyNodeDTO } from "@/lib/protein-types";
 import { CLASS_COLORS, classOf } from "@/lib/protein-types";
-import { fetchProteinList, ORG_COLORS, ORG_SHORT } from "./api";
+import { fetchProteinList, findFamilyPath, flattenFamilies, ORG_COLORS, ORG_SHORT } from "./api";
 import { useDebouncedValue } from "./shared";
 import { useMemo, useRef, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
@@ -58,8 +58,14 @@ export function FamilyTreeView({ ctx }: { ctx: ExplorerCtx }) {
   } = ctx;
 
   // 搜索直接写全局 query（即时回显），网络请求用 300ms 防抖值；
-  // 家族/物种切换时由父级 key 重挂载重置页码，搜索输入时同步重置页码
+  // 家族/物种切换时重置页码（渲染期间调整 state，React 官方模式，不重挂载保留树展开状态）
   const [page, setPage] = useState(1);
+  const resetKey = `${familyCode ?? "all"}|${taxonFilter ?? "all"}`;
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (prevResetKey !== resetKey) {
+    setPrevResetKey(resetKey);
+    setPage(1);
+  }
   const [sort, setSort] = useState<SortField>("default");
   const [dir, setDir] = useState<"asc" | "desc">("asc");
   const tableRef = useRef<HTMLDivElement>(null);
@@ -84,37 +90,18 @@ export function FamilyTreeView({ ctx }: { ctx: ExplorerCtx }) {
   const isFetching = listQuery.isFetching;
   const error = listQuery.error ? (listQuery.error as Error).message : null;
 
-  const famByCode = useMemo(() => {
-    const m = new Map<string, { name: string; nameEn: string }>();
-    for (const c of data.families) {
-      m.set(c.code, { name: c.name, nameEn: c.nameEn });
-      for (const f of c.children ?? []) m.set(f.code, { name: f.name, nameEn: f.nameEn });
-    }
-    return m;
-  }, [data]);
+  const famByCode = useMemo(() => flattenFamilies(data.families), [data]);
 
-  const selectedNode = useMemo<FamilyNodeDTO | null>(() => {
-    for (const c of data.families) {
-      if (c.code === familyCode) return c;
-      for (const f of c.children ?? []) if (f.code === familyCode) return f;
-    }
-    return null;
-  }, [data, familyCode]);
+  const selectedNode = useMemo<FamilyNodeDTO | null>(() => famByCode.get(familyCode ?? "") ?? null, [famByCode, familyCode]);
 
-  /** chips 计数：家族 → byOrganism；大类 → 子家族合计；无 → 物种总数 */
+  /** 面包屑：大类 → 超家族 → 家族 → 亚家族 */
+  const familyPath = useMemo(() => (familyCode ? findFamilyPath(data.families, familyCode) : null), [data, familyCode]);
+
+  /** chips 计数：节点 byOrganism 已递归聚合（bootstrap）；无 → 物种总数 */
   const chipCounts = useMemo(() => {
     const m = new Map<number, number>();
     if (selectedNode) {
-      if (selectedNode.code.includes(".")) {
-        for (const [t, n] of Object.entries(selectedNode.byOrganism)) m.set(Number(t), n);
-      } else {
-        for (const child of selectedNode.children ?? []) {
-          for (const [t, n] of Object.entries(child.byOrganism)) {
-            const k = Number(t);
-            m.set(k, (m.get(k) ?? 0) + n);
-          }
-        }
-      }
+      for (const [t, n] of Object.entries(selectedNode.byOrganism)) m.set(Number(t), n);
     } else {
       for (const o of data.organisms) m.set(o.taxonId, o.proteinCount);
     }
@@ -248,7 +235,9 @@ export function FamilyTreeView({ ctx }: { ctx: ExplorerCtx }) {
       <div className="rounded-xl border bg-card">
         <div className="flex items-center justify-between border-b px-3 py-2.5">
           <h2 className="text-sm font-semibold">蛋白家族分类体系</h2>
-          <span className="text-[10px] text-muted-foreground">{data.stats.familyCount} 个家族</span>
+          <span className="text-[10px] text-muted-foreground" title="大类 → 超家族 → 家族 → 亚家族（UniProt 官方层级链）">
+            {data.stats.superfamilyCount.toLocaleString()} 超家族 · {data.stats.familyCount.toLocaleString()} 叶子家族
+          </span>
         </div>
         <ScrollArea className={`h-[540px] px-2 py-2 ${SCROLLBAR_CLS}`}>
           <FamilyTree
@@ -272,11 +261,26 @@ export function FamilyTreeView({ ctx }: { ctx: ExplorerCtx }) {
         <div className="flex flex-col gap-3 border-b px-3 py-2.5 sm:px-4">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-sm font-semibold">
-              {selectedNode ? (
-                <>
-                  <span style={{ color: CLASS_COLORS[classOf(selectedNode.code)] }}>■</span> {selectedNode.name}
-                  <span className="ml-1.5 text-xs font-normal text-muted-foreground">{selectedNode.nameEn}</span>
-                </>
+              {familyPath && familyPath.length > 0 ? (
+                <span className="inline-flex flex-wrap items-center gap-x-1">
+                  {familyPath.map((n, i) => (
+                    <span key={n.code} className="inline-flex items-center gap-1">
+                      {i > 0 && <ChevronRight className="h-3 w-3 text-muted-foreground/60" />}
+                      <button
+                        className={
+                          i === familyPath.length - 1
+                            ? "hover:underline"
+                            : "text-muted-foreground hover:text-foreground hover:underline"
+                        }
+                        style={i === 0 ? { color: CLASS_COLORS[n.code] } : undefined}
+                        onClick={() => i < familyPath.length - 1 && setFamilyCode(n.code)}
+                        title={n.nameEn}
+                      >
+                        {n.name}
+                      </button>
+                    </span>
+                  ))}
+                </span>
               ) : (
                 "全部蛋白"
               )}
@@ -316,9 +320,9 @@ export function FamilyTreeView({ ctx }: { ctx: ExplorerCtx }) {
             </div>
           </div>
 
-          {selectedNode?.description && (
-            <p className="text-xs leading-relaxed text-muted-foreground" title={selectedNode.description}>
-              {selectedNode.description.length > 120 ? `${selectedNode.description.slice(0, 120)}…` : selectedNode.description}
+          {familyPath && familyPath.length > 1 && (
+            <p className="text-xs leading-relaxed text-muted-foreground" title="UniProt 官方家族层级链">
+              UniProt 官方层级：{familyPath.map((n) => n.nameEn || n.name).join(" → ")}
             </p>
           )}
 

@@ -3,7 +3,7 @@
 import type { ExplorerCtx } from "./ProteinExplorer";
 import { CLASS_COLORS, classOf } from "@/lib/protein-types";
 import type { GroupSummaryDTO } from "@/lib/protein-types";
-import { fetchGroups, fetchProteinList, ORG_COLORS, ORG_SHORT } from "./api";
+import { fetchGroups, fetchProteinList, flattenFamilies, ORG_COLORS, ORG_SHORT } from "./api";
 import { logIntensity, pickGroupRepresentatives, useDebouncedValue } from "./shared";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
@@ -119,17 +119,29 @@ export function PhyloView({ ctx }: { ctx: ExplorerCtx }) {
     return labels;
   }, [tree]);
 
-  /* ===== B. 家族 × 物种覆盖热图 ===== */
+  /* ===== B. 超家族 × 物种覆盖热图（每大类 top 12，多级层级见分类树） ===== */
+  const HEAT_TOP_N = 12;
   const famByTaxon = useMemo(() => new Map(data.organisms.map((o) => [o.taxonId, o])), [data]);
+  const heatRows = useMemo(
+    () =>
+      data.families.map((cls) => ({
+        cls,
+        rows: [...(cls.children ?? [])]
+          .sort((a, b) => b.totalCount - a.totalCount)
+          .slice(0, HEAT_TOP_N),
+        allCount: cls.children?.length ?? 0,
+      })),
+    [data]
+  );
   const heatMax = useMemo(() => {
     let max = 0;
-    for (const cls of data.families) {
-      for (const fam of cls.children ?? []) {
+    for (const g of heatRows) {
+      for (const fam of g.rows) {
         for (const n of Object.values(fam.byOrganism)) if (n > max) max = n;
       }
     }
     return max;
-  }, [data]);
+  }, [heatRows]);
 
   /* ===== C. 直系同源组浏览 ===== */
   const [crossOnly, setCrossOnly] = useState(true);
@@ -157,12 +169,8 @@ export function PhyloView({ ctx }: { ctx: ExplorerCtx }) {
   const groups = groupsQuery.data ?? null;
 
   const famNameByCode = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const cls of data.families) {
-      m.set(cls.code, cls.name);
-      for (const f of cls.children ?? []) m.set(f.code, f.name);
-    }
-    return m;
+    const m = flattenFamilies(data.families);
+    return new Map([...m.entries()].map(([code, node]) => [code, node.name] as const));
   }, [data]);
 
   /* 组成员弹窗 */
@@ -249,16 +257,16 @@ export function PhyloView({ ctx }: { ctx: ExplorerCtx }) {
         </div>
       </section>
 
-      {/* B. 家族 × 物种覆盖热图 */}
-      <section className="rounded-xl border bg-card" aria-label="家族与物种覆盖热图">
+      {/* B. 超家族 × 物种覆盖热图 */}
+      <section className="rounded-xl border bg-card" aria-label="超家族与物种覆盖热图">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-3">
           <div className="max-w-xl">
             <h2 className="flex items-center gap-1.5 text-sm font-semibold">
               <Grid3x3 className="h-4 w-4 text-emerald-600" />
-              家族 × 物种覆盖热图
+              超家族 × 物种覆盖热图
             </h2>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              行为全部 <span className="font-medium text-foreground">{data.stats.familyCount}</span> 个家族（按大类分组），列为 10 种模式生物。
+              行为各大类规模最大的前 {HEAT_TOP_N} 个超家族/家族（UniProt 官方层级，全部 {data.stats.superfamilyCount.toLocaleString()} 个超家族及 {data.stats.familyCount.toLocaleString()} 个叶子家族见左侧分类树），列为 10 种模式生物。
               颜色深浅按数量对数强度着色（大类配色），空白表示该物种无该家族成员。点击行跳转家族分类树。
             </p>
           </div>
@@ -285,7 +293,7 @@ export function PhyloView({ ctx }: { ctx: ExplorerCtx }) {
             </colgroup>
             <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
               <tr className="[&>th]:px-2 [&>th]:py-2 [&>th]:text-center [&>th]:text-[10px] [&>th]:font-medium [&>th]:text-muted-foreground">
-                <th className="text-left">家族</th>
+                <th className="text-left">超家族 / 家族</th>
                 {data.organisms.map((o) => (
                   <th key={o.taxonId} title={`${o.commonName} · ${o.scientificName}`}>
                     {ORG_SHORT[o.taxonId] ?? o.commonName}
@@ -294,16 +302,18 @@ export function PhyloView({ ctx }: { ctx: ExplorerCtx }) {
               </tr>
             </thead>
             <tbody>
-              {data.families.map((cls) => (
+              {heatRows.map(({ cls, rows, allCount }) => (
                 <Fragment key={cls.code}>
                   <tr>
                     <td colSpan={11} className="sticky top-[33px] z-[5] border-y bg-muted/70 px-3 py-1 text-[11px] font-semibold backdrop-blur">
                       <span className="mr-1.5 inline-block h-2 w-2 rounded-full align-middle" style={{ backgroundColor: CLASS_COLORS[cls.code] }} />
                       {cls.name}
-                      <span className="ml-1.5 font-normal text-muted-foreground">{cls.children?.length ?? 0} 个家族 · {cls.totalCount.toLocaleString()} 条</span>
+                      <span className="ml-1.5 font-normal text-muted-foreground">
+                        {allCount.toLocaleString()} 个超家族/家族 · Top {Math.min(HEAT_TOP_N, allCount)} 展示 · {cls.totalCount.toLocaleString()} 条
+                      </span>
                     </td>
                   </tr>
-                  {(cls.children ?? []).map((fam) => (
+                  {rows.map((fam) => (
                     <tr
                       key={fam.code}
                       className="group/heat cursor-pointer transition-colors hover:bg-accent/40"
@@ -311,12 +321,17 @@ export function PhyloView({ ctx }: { ctx: ExplorerCtx }) {
                         setFamilyCode(fam.code);
                         setView("tree");
                       }}
-                      title={`点击查看「${fam.name}」家族蛋白列表`}
+                      title={`点击查看「${fam.name}」超家族/家族蛋白列表`}
                     >
                       <td className="sticky left-0 z-[4] truncate border-b border-border/50 bg-card px-3 py-1 text-left group-hover/heat:bg-accent/40">
                         <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full align-middle" style={{ backgroundColor: CLASS_COLORS[cls.code] }} />
                         <span className="font-medium">{fam.name}</span>
-                        <span className="ml-1.5 text-[10px] text-muted-foreground tabular-nums">{fam.count.toLocaleString()}</span>
+                        {(fam.children?.length ?? 0) > 0 && (
+                          <span className="ml-1 rounded bg-muted px-1 py-px text-[9px] text-muted-foreground" title={`${fam.children!.length} 个下一级家族`}>
+                            {(fam.children?.length ?? 0)} 子级
+                          </span>
+                        )}
+                        <span className="ml-1.5 text-[10px] text-muted-foreground tabular-nums">{fam.totalCount.toLocaleString()}</span>
                       </td>
                       {data.organisms.map((o) => {
                         const n = fam.byOrganism[o.taxonId] ?? 0;

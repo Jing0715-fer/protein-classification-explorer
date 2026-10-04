@@ -3,11 +3,37 @@
 import type {
   BootstrapDTO,
   CompareDTO,
+  FamilyNodeDTO,
   GroupListDTO,
   ProteinDetailDTO,
   ProteinListDTO,
   SearchResultDTO,
 } from "@/lib/protein-types";
+
+/** 递归展平家族树（大类→超家族→家族→亚家族）→ code -> node */
+export function flattenFamilies(nodes: FamilyNodeDTO[]): Map<string, FamilyNodeDTO> {
+  const m = new Map<string, FamilyNodeDTO>();
+  const walk = (list: FamilyNodeDTO[]) => {
+    for (const n of list) {
+      m.set(n.code, n);
+      if (n.children?.length) walk(n.children);
+    }
+  };
+  walk(nodes);
+  return m;
+}
+
+/** 找从根到指定 code 的路径链（面包屑用） */
+export function findFamilyPath(nodes: FamilyNodeDTO[], code: string): FamilyNodeDTO[] | null {
+  for (const n of nodes) {
+    if (n.code === code) return [n];
+    if (n.children?.length) {
+      const sub = findFamilyPath(n.children, code);
+      if (sub) return [n, ...sub];
+    }
+  }
+  return null;
+}
 
 let bootstrapCache: BootstrapDTO | null = null;
 let bootstrapPromise: Promise<BootstrapDTO> | null = null;

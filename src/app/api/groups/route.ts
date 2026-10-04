@@ -23,9 +23,10 @@ export async function GET(req: NextRequest) {
   };
   if (crossOnly) where.crossSpecies = true;
   if (family) {
-    where.familyCode = family.includes(".")
-      ? { equals: family }
-      : { startsWith: `${family}.` };
+    // 多级层级：同时匹配该节点自身与全部子孙编码（OR 提升到 where 层）
+    where.AND = [
+      { OR: [{ familyCode: family }, { familyCode: { startsWith: `${family}.` } }] },
+    ];
   }
   if (q) {
     const term = q.replace(/[%_]/g, "");

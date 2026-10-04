@@ -1,7 +1,7 @@
 /**
- * 全量数据入库：87,728 蛋白 / 13 大类 115 家族 / OrthoDB 直系同源组
+ * 全量数据入库：87,728 蛋白 / 13 大类 + UniProt 官方超家族→家族→亚家族层级 / OrthoDB 直系同源组
  * 运行: bun run scripts/seed-full.ts
- * 输入: download/classified.jsonl + download/families.json
+ * 输入: download/hier-classified.jsonl + download/hier-families.json
  */
 import { PrismaClient } from "@prisma/client";
 import { CLASSES } from "./classify";
@@ -62,9 +62,9 @@ async function main() {
   const t0 = Date.now();
   console.log("=== 全量入库开始 ===");
 
-  // 1) 流式读取 classified.jsonl
+  // 1) 流式读取 hier-classified.jsonl
   const proteins: ClassifiedProtein[] = [];
-  const file = Bun.file("download/classified.jsonl");
+  const file = Bun.file("download/hier-classified.jsonl");
   const reader = file.stream().getReader();
   const decoder = new TextDecoder();
   let buf = "";
@@ -100,8 +100,9 @@ async function main() {
   const orgByTaxon = new Map((await db.organism.findMany()).map((o) => [o.taxonId, o]));
   console.log(`物种 ${orgByTaxon.size} 个`);
 
-  // 4) 家族（先大类后子家族，保证树形组装）
-  const famDefs = (await Bun.file("download/families.json").json()) as {
+  // 4) 家族层级节点（大类 + 超家族/家族/亚家族，编码即层级）
+  const famDefs = (await Bun.file("download/hier-families.json").json()) as {
+    classes: { code: string; name: string; nameEn: string; description: string }[];
     families: { code: string; name: string; nameEn: string; description: string }[];
   };
   await db.family.createMany({
@@ -121,7 +122,7 @@ async function main() {
     ],
   });
   const famByCode = new Map((await db.family.findMany()).map((f) => [f.code, f]));
-  console.log(`家族 ${famByCode.size} 个（${CLASSES.length} 大类 + ${famDefs.families.length} 子家族）`);
+  console.log(`家族节点 ${famByCode.size} 个（${CLASSES.length} 大类 + ${famDefs.families.length} 超家族/家族/亚家族）`);
 
   // 5) OrthoDB 直系同源组（≥2 个成员才建组）
   const groups = new Map<string, { members: ClassifiedProtein[] }>();
