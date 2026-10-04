@@ -275,13 +275,13 @@ export interface SearchResultDTO {
   organisms: { taxonId: number; commonName: string; proteinCount: number }[];
 }
 
-/** 13 个大类的配色（自然学术色板，用于树/矩阵/图例） */
+/** 14 个大类的配色（自然学术色板，用于树/矩阵/图例） */
 export const CLASS_COLORS: Record<string, string> = {
   "1": "#6e8b3d", // 酶类 - 橄榄绿
   "2": "#c9a227", // 激酶 - 芥末金
   "3": "#2e7d64", // 受体与信号 - 松绿
   "4": "#b5496a", // 转录与染色质 - 绯梅
-  "5": "#c0762f", // 通道与转运 - 琥珀赭
+  "5": "#c0762f", // 膜通道与膜转运 - 琥珀赭
   "6": "#a35a3c", // 细胞骨架 - 赭红
   "7": "#8a7b52", // ECM与分泌 - 黄褐
   "8": "#ab3b30", // 免疫防御 - 砖红
@@ -289,7 +289,8 @@ export const CLASS_COLORS: Record<string, string> = {
   "10": "#3d7a78", // 蛋白质稳态 - 深青
   "11": "#b8638f", // 周期与肿瘤 - 梅粉
   "12": "#96637e", // 核酸加工 - 灰梅
-  "13": "#8b857a", // 膜与其他 - 暖灰
+  "13": "#8a6a4d", // 细胞内运输 - 古铜
+  "14": "#8b857a", // 其他功能蛋白 - 暖灰
 };
 
 export const CLASS_NAMES: Record<string, string> = {
@@ -297,7 +298,7 @@ export const CLASS_NAMES: Record<string, string> = {
   "2": "激酶",
   "3": "受体与信号转导",
   "4": "转录与染色质",
-  "5": "通道与转运",
+  "5": "膜通道与膜转运",
   "6": "细胞骨架与结构",
   "7": "胞外基质与分泌",
   "8": "免疫与防御",
@@ -305,7 +306,8 @@ export const CLASS_NAMES: Record<string, string> = {
   "10": "蛋白质稳态",
   "11": "细胞周期与肿瘤调控",
   "12": "核酸代谢与加工",
-  "13": "膜蛋白与其他",
+  "13": "细胞内运输",
+  "14": "其他功能蛋白",
 };
 
 export function classOf(familyCode: string): string {

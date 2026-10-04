@@ -1,14 +1,11 @@
-/** 检查 13.1 兜底桶中的蛋白在 UniProt 是否真有家族链（真遗漏检测）
- *  方法：直接查 flat-file 的 CC -!- SIMILARITY 段（家族链来源） */
+/** 检查未分类兜底桶（未分类蛋白 + 其他膜蛋白）中的蛋白在 UniProt 是否真有家族链（真遗漏检测）
+ *  方法：直接查 flat-file 的 CC -!- SIMILARITY 段（家族链来源）
+ *  运行: bun run scripts/audit-missed.ts */
 import { db } from "../src/lib/db";
 
-const ORG_TAXON: Record<number, number> = {
-  9606: 1, 10090: 2, 10116: 3, 7955: 4, 9031: 5, 7227: 6, 6239: 7, 559292: 8, 3702: 9, 83333: 10,
-};
-
 async function main() {
-  // 13.1 全量（5813 条太多，按物种分层抽样 60 条）
-  const fam = await db.family.findUnique({ where: { code: "13.1" } });
+  // 兜底桶按名称定位（未分类蛋白 ~5.7k，按物种分层抽样 60 条）
+  const fam = await db.family.findFirst({ where: { name: "未分类蛋白" } });
   if (!fam) return;
   const orgs = await db.organism.findMany();
   const samples: { accession: string; name: string }[] = [];

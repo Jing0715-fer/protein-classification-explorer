@@ -5,9 +5,9 @@ async function main() {
   const orgs = await db.organism.findMany();
   const samples: string[] = [];
   for (const o of orgs) {
-    // 每物种随机取 1-2 条已分类（非 13.1/13.2）蛋白
+    // 每物种随机取 1-2 条已分类（非兜底桶）蛋白
     const ps = await db.protein.findMany({
-      where: { organismId: o.id, family: { NOT: { code: { startsWith: "13.1" } } } },
+      where: { organismId: o.id, family: { NOT: { OR: [{ code: { startsWith: "14.1" } }, { code: { startsWith: "14.2" } }] } } },
       take: 2,
       skip: Math.floor(Math.random() * 50),
       include: { family: true },

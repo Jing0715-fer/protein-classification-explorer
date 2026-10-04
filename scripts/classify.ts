@@ -54,7 +54,7 @@ export const CLASSES: ClassDef[] = [
   { code: "2", name: "激酶", nameEn: "Kinases", color: "#65a30d" },
   { code: "3", name: "受体与信号转导", nameEn: "Receptors & Signaling", color: "#0d9488" },
   { code: "4", name: "转录与染色质", nameEn: "Transcription & Chromatin", color: "#e11d48" },
-  { code: "5", name: "通道与转运", nameEn: "Channels & Transporters", color: "#d97706" },
+  { code: "5", name: "膜通道与膜转运", nameEn: "Membrane channels & transporters", color: "#d97706" },
   { code: "6", name: "细胞骨架与结构", nameEn: "Cytoskeleton & Structural", color: "#ea580c" },
   { code: "7", name: "胞外基质与分泌", nameEn: "ECM & Secreted", color: "#ca8a04" },
   { code: "8", name: "免疫与防御", nameEn: "Immunity & Defense", color: "#dc2626" },
@@ -62,7 +62,8 @@ export const CLASSES: ClassDef[] = [
   { code: "10", name: "蛋白质稳态", nameEn: "Proteostasis", color: "#0891b2" },
   { code: "11", name: "细胞周期与肿瘤调控", nameEn: "Cell Cycle & Oncogenesis", color: "#db2777" },
   { code: "12", name: "核酸代谢与加工", nameEn: "Nucleic Acid Processing", color: "#c026d3" },
-  { code: "13", name: "膜蛋白与其他", nameEn: "Membrane & Others", color: "#78716c" },
+  { code: "13", name: "细胞内运输", nameEn: "Intracellular transport", color: "#8a6a4d" },
+  { code: "14", name: "其他功能蛋白", nameEn: "Other functional proteins", color: "#78716c" },
 ];
 
 export interface FamilyDef {
@@ -121,7 +122,7 @@ export const FAMILIES: FamilyDef[] = [
   { code: "4.10", name: "通用转录机器", nameEn: "General transcription machinery", description: "RNA 聚合酶 II/GTF/TBP/中介子" },
   { code: "4.11", name: "其他转录因子", nameEn: "Other TFs", description: "未归入以上家族的转录调控因子" },
   { code: "4.12", name: "其他DNA结合蛋白", nameEn: "Other DNA-binding", description: "具备 DNA 结合特征的其他蛋白" },
-  // 类 5 通道与转运
+  // 类 5 膜通道与膜转运（仅限跨膜运输系统成员：通道/载体/泵/转位酶）
   { code: "5.1", name: "钾离子通道", nameEn: "Potassium channels", description: "KV/KCa/KIR 等钾通道" },
   { code: "5.2", name: "钠钙通道", nameEn: "Na/Ca channels", description: "电压门控钠通道与钙通道" },
   { code: "5.3", name: "氯离子通道", nameEn: "Chloride channels", description: "CLC/CFTR 等阴离子通道" },
@@ -130,10 +131,10 @@ export const FAMILIES: FamilyDef[] = [
   { code: "5.6", name: "ABC转运蛋白", nameEn: "ABC transporters", description: "ATP 结合盒转运体" },
   { code: "5.7", name: "水通道蛋白", nameEn: "Aquaporins", description: "水/甘油选择性通道" },
   { code: "5.8", name: "膜孔蛋白", nameEn: "Porins", description: "细菌外膜 β 桶孔道蛋白" },
-  { code: "5.9", name: "P型ATP酶与离子泵", nameEn: "P-type ATPases", description: "Na+/K+/Ca2+ transporting ATPase 离子泵" },
-  { code: "5.10", name: "囊泡运输与胞吞", nameEn: "Vesicle transport", description: "SNARE/SEC/网格蛋白/发动蛋白机器" },
-  { code: "5.11", name: "其他转运相关", nameEn: "Other transport", description: "未归入以上家族的转运/载体蛋白" },
-  { code: "5.12", name: "核孔与核质运输", nameEn: "Nuclear pore & transport", description: "Importin/Exportin/核孔复合体" },
+  { code: "5.9", name: "P型ATP酶与离子泵", nameEn: "P-type ATPases", description: "Na+/K+/Ca2+ transporting ATPase 离子泵（含 F/V 型泵复合体可溶亚基）" },
+  { code: "13.1", name: "囊泡运输与胞吞", nameEn: "Vesicle transport", description: "SNARE/SEC/网格蛋白/外泌体复合体等囊泡运输机器" },
+  { code: "5.11", name: "其他转运相关", nameEn: "Other transport", description: "未归入以上家族的膜转运/载体蛋白与泵复合体组分" },
+  { code: "13.2", name: "核孔与核质运输", nameEn: "Nuclear pore & transport", description: "Importin/Exportin/核孔复合体" },
   // 类 6 细胞骨架与结构
   { code: "6.1", name: "肌动蛋白", nameEn: "Actins", description: "ACT 肌动蛋白家族" },
   { code: "6.2", name: "微管蛋白", nameEn: "Tubulins", description: "α/β/γ 微管蛋白" },
@@ -199,9 +200,9 @@ export const FAMILIES: FamilyDef[] = [
   { code: "12.6", name: "RNA结合蛋白", nameEn: "RNA-binding proteins", description: "RRM/KH 含 RNA 结合蛋白" },
   { code: "12.7", name: "核糖核酸酶", nameEn: "Ribonucleases", description: "RNase A/H 家族" },
   { code: "12.8", name: "其他核酸加工", nameEn: "Other nucleic acid processing", description: "未归入以上家族的核酸加工蛋白" },
-  // 类 13 膜与其他
-  { code: "13.1", name: "其他膜蛋白", nameEn: "Other membrane proteins", description: "跨膜区标注但未归入以上家族" },
-  { code: "13.2", name: "未分类蛋白", nameEn: "Unclassified", description: "注释信息不足以归入已知家族" },
+  // 类 14 其他功能蛋白（原"膜蛋白与其他"更名：仅 14.1 节点按膜关键词归集，其余为未落入前 13 大类的具名家族）
+  { code: "14.1", name: "其他膜蛋白", nameEn: "Other membrane proteins", description: "有跨膜/膜定位注释但未归入具名家族的蛋白" },
+  { code: "14.2", name: "未分类蛋白", nameEn: "Unclassified", description: "注释信息不足以归入已知家族" },
 ];
 
 // ===== 规则表（按优先级排列，首个命中生效） =====
@@ -398,7 +399,40 @@ const RULES: Rule[] = [
       gn(c, /^(tf[a-z]|etv|elk|ets[12]|gata[1-6]|nf-kb|nfkbia|rel|stat[1-7]|smad[1-9]|runx|cbfb|lefl|tcfl|lyl1|atf|cebpa|irf|foxo|hnf4|onecut|lhx|lim|arid|fox)/),
   },
   { code: "4.12", test: (c) => kw(c, "DNA-binding") || kw(c, "DNA-binding protein") },
-  // --- 通道与转运 ---
+  // --- 可溶性氧化还原电子载体/储铁与辅因子（先于通道转运块，防止 kw "Transport" 误入） ---
+  {
+    code: "1.1",
+    test: (c) =>
+      nm(c, /thioredoxin|glutaredoxin|met sulfoxide reductase|electron transfer flavoprotein|etf-qo|adrenodoxin|putidaredoxin|frataxin|ferritin|acyl carrier protein|nadh dehydrogenase|ferredoxin|flavodoxin|nifu|iron-sulfur cluster assembly|gcvp/i) ||
+      (kw(c, "Electron transport") && !kw(c, "Photosynthesis")),
+  },
+  // --- 分泌型可溶载体（血浆脂质/维生素/铁/氧运输，非膜蛋白） ---
+  {
+    code: "7.5",
+    test: (c) =>
+      nm(c, /apolipoprotein|albumin|alpha-fetoprotein|vitamin d-binding|plant lipid transfer|hemopexin|retinol-binding|retinaldehyde-binding|beta-2-glycoprotein|sex hormone-binding|histidine-rich glycoprotein|transferrin(?! receptor)|hemoglobin|myoglobin|globin|lipocalin/i),
+  },
+  // --- 胞内可溶脂质载体与靶向因子（细胞内运输：非囊泡脂质转移） ---
+  {
+    code: "13.1",
+    test: (c) =>
+      nm(c, /lipid transfer|osbp|star-related|ceramide transfer|tocopherol transfer|triglyceride transfer|phosphatidylcholine transfer|phosphatidylinositol transfer|glycolipid transfer|acyl-coa-binding|acbp|peroxisomal targeting|biogenesis of lysosome-related/i),
+  },
+  // --- LDL 受体家族（内吞受体，归受体类而非转运） ---
+  { code: "3.13", test: (c) => nm(c, /low-density lipoprotein receptor|ldl receptor/i) || gn(c, /^(ldlr|lrp[0-9])/) },
+  // --- 信号/钙结合/接头家族（原落入杂项桶的高置信路由） ---
+  { code: "3.11", test: (c) => nm(c, /s-100|recoverin|visinin/i) || gn(c, /^s100/) },
+  { code: "3.9", test: (c) => nm(c, /14-3-3|arrestin/i) },
+  { code: "3.10", test: (c) => nm(c, /semaphorin/i) },
+  { code: "4.11", test: (c) => nm(c, /aux\/iaa|lob domain|mterf|response regulator/i) || gn(c, /^iaa[0-9]/) },
+  { code: "12.6", test: (c) => nm(c, /pentatricopeptide/i) },
+  { code: "6.11", test: (c) => nm(c, /annexin/i) },
+  { code: "6.12", test: (c) => nm(c, /fimbrial protein/i) },
+  { code: "10.5", test: (c) => nm(c, /skp1|ankyrin socs box/i) || gn(c, /^asb[0-9]/) },
+  { code: "11.5", test: (c) => nm(c, /\bbtg[0-9]/i) },
+  { code: "13.1", test: (c) => nm(c, /synaptotagmin/i) },
+  { code: "13.2", test: (c) => nm(c, /\bimportin\b|\bexportin\b|\bkaryopherin\b|\btransportin\b|nuclear pore|nucleoporin|\bnpip\b/i) },
+  // --- 通道与转运（仅跨膜运输系统：通道/载体/泵/转位酶） ---
   { code: "5.1", test: (c) => kw(c, "Potassium channel") || nm(c, /potassium channel|\bk+ channel/i) },
   { code: "5.2", test: (c) => kw(c, "Sodium channel") || kw(c, "Calcium channel") || nm(c, /sodium channel|calcium channel|voltage-dependent (calcium|sodium)/i) },
   { code: "5.3", test: (c) => kw(c, "Chloride channel") || nm(c, /chloride channel|\bclc-[0-9]/i) },
@@ -413,10 +447,10 @@ const RULES: Rule[] = [
   { code: "5.8", test: (c) => nm(c, /porin/i) || kw(c, "Porin") },
   { code: "5.9", test: (c) => nm(c, /transporting atpase|p-type atpase|na\+\/k\+|sodium pump|calcium-transporting/i) || kw(c, "Sodium/potassium-transporting ATPase") },
   {
-    code: "5.10",
+    code: "13.1",
     test: (c) =>
-      nm(c, /syntaxin|snap-|vesicle-associated|vesicle-fusing|clathrin|coatomer|dynamin|endophilin|amphiphysin|sorting nexin|arfgap|rab escort|guanine nucleotide dissociation inhibitor|sec[0-9]|secretory carrier|vesicle transport|endocytic/i) ||
-      kw(c, "Endocytosis") || kw(c, "ER-Golgi transport") || kw(c, "Golgi stack") || gn(c, /^(snap|stx|vamp|sec[0-9]|ap[1-5][abm]|apba|eps|cltc|cop[abg]|dyn|rab3a|rab5a|rabs)/),
+      nm(c, /syntaxin|snap-|vesicle-associated|vesicle-fusing|clathrin|coatomer|dynamin|endophilin|amphiphysin|sorting nexin|arfgap|rab escort|guanine nucleotide dissociation inhibitor|sec(?!6[12])[0-9]|secretory carrier|vesicle transport|endocytic|exocyt|trafficking|adaptor|epsin|cop[abg]|trapp/i) ||
+      kw(c, "Endocytosis") || kw(c, "ER-Golgi transport") || kw(c, "Golgi stack") || gn(c, /^(snap|stx|vamp|sec(?!6[12])[0-9]|ap[1-5][abm]|apba|eps|cltc|cop[abg]|dyn|rab3a|rab5a|rabs)/),
   },
   // --- 细胞骨架 ---
   { code: "6.1", test: (c) => nm(c, /^actin[ ,(-]|^actin-related|^actin$/i) || gn(c, /^(act[a-z]+[0-9]*|actr|act[1-7]$)/) },
@@ -457,10 +491,10 @@ const RULES: Rule[] = [
       gn(c, /^(cdh[1-9]|itg[a-g]|ctnn[a-z]|dsc[1-3]|dsp|gja|gjb|gjc|ocln|jam[123]|pvrl|ncam|l1cam|icam|vcam|selp|sele|tln|pxn|vinc)/),
   },
   // --- 转运兕底与核质运输（在细胞骨架之后，避免抢驱动蛋白） ---
-  { code: "5.11", test: (c) => kw(c, "Transport") || kw(c, "Protein transport") || kw(c, "Lipid-binding") || kw(c, "Lipid transport") || kw(c, "Sugar transport") || nm(c, /fatty acid-binding|sterol carrier|lipid transfer|lipocalin|apolipoprotein|ferritin|transferrin|hemoglobin|myoglobin/i) },
+  { code: "5.11", test: (c) => kw(c, "Transport") || kw(c, "Protein transport") || kw(c, "Lipid-binding") || kw(c, "Lipid transport") || kw(c, "Sugar transport") || kw(c, "Ion transport") || kw(c, "Amino-acid transport") || nm(c, /fatty acid-binding|sterol carrier|transporter|permease|symporter|antiporter|transport protein|secretory pathway/i) },
   {
-    code: "5.12",
-    test: (c) => nm(c, /importin|exportin|karyopherin|nuclear pore|nucleoporin|ran-binding|nuclear transport|rcc1|ran-specific/i) || gn(c, /^(kpn|ipo|xpo|nup|ranbp|rangap|rnpc|kaa)/),
+    code: "13.2",
+    test: (c) => nm(c, /importin|exportin|karyopherin|nuclear pore|nucleoporin|ran-binding|nuclear transport|rcc1|ran-specific|npip/i) || gn(c, /^(kpn|ipo|xpo|nup|ranbp|rangap|rnpc|kaa)/),
   },
   // --- 免疫与防御（先于分泌/膜） ---
   {
@@ -545,8 +579,8 @@ const RULES: Rule[] = [
   { code: "7.6", test: (c) => kw(c, "Extracellular matrix") || kw(c, "Extracellular matrix protein") },
   { code: "7.5", test: (c) => kw(c, "Secreted") },
   // --- 膜与其他兜底 ---
-  { code: "13.1", test: (c) => kw(c, "Transmembrane") || kw(c, "Transmembrane helix") || kw(c, "Membrane") },
-  { code: "13.2", test: () => true },
+  { code: "14.1", test: (c) => kw(c, "Transmembrane") || kw(c, "Transmembrane helix") || kw(c, "Membrane") },
+  { code: "14.2", test: () => true },
 ];
 
 export function classify(p: RawProtein): { ctx: MatchCtx; code: string } {
@@ -554,7 +588,7 @@ export function classify(p: RawProtein): { ctx: MatchCtx; code: string } {
   for (const rule of RULES) {
     if (rule.test(ctx)) return { ctx, code: rule.code };
   }
-  return { ctx, code: "13.2" };
+  return { ctx, code: "14.2" };
 }
 
 // ===== CLI 入口：读取 jsonl → 分类 → 输出 =====

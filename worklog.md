@@ -298,3 +298,44 @@ Stage Summary:
 - 修复隐藏的 trie 分裂 bug（同写法差异导致同一演化支被拆成多分支——旧版酵母/动物分离的直接根因），渲染层键归一化使其结构性免疫
 - 仓库新增 README.md（完整项目文档）+ 项目介绍/元数据文案更新
 - 交接：scripts/update-phylo.ts 可重跑；守护进程启动方式记录在 worklog（python 双 fork）
+
+---
+Task ID: 15
+Agent: Z.ai Code (main)
+Task: 膜分类科学性修正——「其他膜蛋白/通道蛋白分类中很多不是膜蛋白」根治（应用户反馈）
+
+Work Log:
+- 【数据取证】写三道审计（audit-membrane/trace 脚本，完成后清理）以 UniProt 关键词为证据逐蛋白判定膜属性（整合膜=Transmembrane×、外周=Membrane 等）：
+  · 旧类 5「通道与转运」9,490 条：整合膜仅 67.9% + 外周 16.6%，非膜 1,470 条（15.5%）
+  · 旧类 13「膜蛋白与其他」15,940 条：非膜 66.3%（10,570 条）——类名与内容严重不符，即用户指出的「其他膜蛋白里很多不是膜蛋白」
+- 【根因定位】四个系统性缺陷：
+  ① UniProt kw "Transport" 过宽（含硫氧还蛋白 Electron transport、白蛋白 Lipid transport、输入蛋白 Protein transport）→ 旧兜底规则 5.11 kw Transport 把全部可溶载体吸入类 5
+  ② 转运正则 /porin/ 无词边界 → "nucleoPORIN"（核孔蛋白）命中 porin → 核孔蛋白全部误入类 5
+  ③ 囊泡运输机器（SNARE/外被/外泌体/输入蛋白）与核孔运输混在类 5，名称却叫「通道与转运」
+  ④ 类 13 名为「膜蛋白与其他」但 2/3 内容（14-3-3/S-100/PPR/annexin 等具名家族）与膜无关
+- 【分类体系重构 v5：13 → 14 大类】
+  · 类 5 更名「通道与转运」→「膜通道与膜转运」（Membrane channels & transporters），严格限定跨膜运输系统（通道/载体/泵/转位酶/孔蛋白）
+  · 新增类 13「细胞内运输」（Intracellular transport）：囊泡运输机器（SNARE/网格蛋白/接头复合体/TRAPP/外泌体/COPI/COG/ESCRT）+ 核孔与核质运输（输入蛋白/输出蛋白/核孔蛋白）+ 胞内脂质转移（OSBP/START/Sec14/ACBP）
+  · 旧类 13 更名并改码为类 14「其他功能蛋白」——不再冠「膜蛋白」之名；「其他膜蛋白」节点（2,032 条按 Transmembrane/Membrane 关键词归集，诚实）保留其中
+- 【六组路由手术（classify.ts 规则引擎 + classify-hierarchy.ts CLASS_RULES 双层同步）】
+  ① 可溶性氧化还原电子载体/储铁辅因子 → 酶类：thioredoxin(64)/glutaredoxin(57)/MsrB(23)/ETF(29)/adrenodoxin(13)/frataxin(8)/ferritin(20)/ACP(13)/全部 cytochrome 家族/complex I~III 呼吸链亚基家族(~300)/ferredoxin/flavodoxin/Rieske/UQCR/alternative oxidase/peroxiredoxin
+  ② 分泌型可溶载体 → 胞外基质与分泌：apolipoprotein(40+，O/MICOS 膜蛋白除外)/ALB/AFP/VDB(14)/plant LTP(55)/transferrin(10)/hemopexin(5)/retinol-binding
+  ③ 囊泡与核质运输机器 → 细胞内运输：syntaxin(88)/synaptobrevin(62)/SNAP-25/SNAP(33)/sorting nexin(84)/STXBP(41)/TRAPP(39)/SEC2/3/5/6/8/10/13/15/16/23/24/31/EXO70/84/clathrin/adaptin/COPG/COPE/COG1-8/epsin/endophilin/complexin/EMP24/VPS×/importin αβ(72)/exportin(28)/nucleoporin×6/NPIP/RANBP/synaptotagmin(61)/OSBP(42)/GLTP/STARD3/Sec14/SFH/PITP/PDE6D/TOM1（区分大小写 TOM1=贩运 vs Tom40=线粒体转位酶）
+  ④ 杂项桶高置信家族归位：S-100(57)/recoverin(45)/arrestin(40)/14-3-3(46)/semaphorin(58)/DOCK(26)/patched(31)/BRAG → 受体与信号；Aux/IAA(29)/LOB(43)/ARR(23)/mTERF(27) → 转录；PPR(457!) → RNA 结合；annexin(48)/fimbrial(47) → 细胞骨架；SKP1(31)/ASB(39) → 蛋白质稳态；BTG(17) → 细胞周期；LDLR(37) → 受体类（内吞受体）
+  ⑤ 规则保真修复：\btransportin\b 词边界（防 transporTING 误匹配 P 型 ATPase）；sec(?!6[12])[0-9]（保 SecY/Sec61/Sec62 转位酶在类 5）；\bporins?\b（防 nucleoporin）；apolipoprotein(?! o)（保 ApoO/MICOS）；kw Electron transport 加 !Photosynthesis 守卫
+  ⑥ ZH_PREFIX 新增 30 词条（输入蛋白/输出蛋白/核孔蛋白/分选连接蛋白/突触结合蛋白/网格蛋白/外泌体复合体/TRAPP/载脂蛋白/铁蛋白/谷氧还蛋白/PPR/S100/恢复蛋白/信号素…），EXO70/EXO84 显示名消歧
+- 【验证】
+  · 分类引擎四项校验全过：MFS=1 / 同名残留=0 / 引用一致=0 / 显示名撞名=0
+  · 膜属性复审：类 5 整合膜 85.3%+外周 8.2%（膜关联 93.5%，旧 84.5%），残量非膜均为泵复合体可溶亚基（V-ATPase/NAC/ABC-F）等合理成员；类 13 非膜 32.7% 全为 TRAPP/VPS/BLOC/ORP 等胞质运输机器（类名不宣称膜属性，诚实）；类 14 更名后不再误导
+  · 关键家族落位复核（28 个抽查全对）：P-type ATPase(176)→5.5、SecY/SEC61(12)→5.71、thioredoxin(64)→1.47、importin-β(41)→13.10、ApoE(15)→7.40、PPR(457)→12.2、S-100(57)→3.18、LDLR(37)→3.28、annexin(48)→6.12、peroxiredoxin-like(12)→1.328
+  · 蛋白详情家族链：P10599 硫氧还蛋白「酶类→硫氧还蛋白家族」✓、O95373 Importin-7「细胞内运输→输入蛋白·β家族」✓、P02649 ApoE「胞外基质与分泌→载脂蛋白 A1/A4/E 家族」✓
+  · 重跑管线 5.6s + seed-full 0.2min：88,515 蛋白 / 8,827 节点（14 大类 + 8,813 层级）/ 10,504 直系同源组；分类报告：类 1 酶类 18,229（+~500 呼吸链与载体）/ 类 5 膜通道与膜转运 6,550（原 9,490）/ 类 13 细胞内运输 2,254 / 类 14 其他功能蛋白 14,382
+  · dev server 双 fork 守护重启；bootstrap API 14 大类正确返回
+  · Agent Browser 全链路：14 大类树渲染/膜通道与膜转运展开（无 thioredoxin/importin，SLC 超群 2,210 正常）/细胞内运输展开（囊泡运输与胞吞 377 + SNARE 88 + 输入蛋白 β 41…）/⌘K 搜 P10599 打开详情（家族链酶类·硫氧还蛋白 ✓）/进化视角 71 个 SVG/统计条 14 大类/移动端 390px 无溢出/暗色模式切换正常/控制台零报错、dev.log 全 200
+  · VLM 视觉审查 3 张截图（树视图/进化视角/移动端）："布局严谨、高水准学术期刊风格、无文字重叠、移动端无溢出"
+- 【配套更新】README（14 大类+膜属性审计说明+管线图 v5）、audit-missed/audit-reverse 改用家族名定位兜底桶、protein-types.ts CLASS_COLORS/CLASS_NAMES（新增 13 古铜/14 暖灰）
+
+Stage Summary:
+- 根治用户指出的两类「非膜蛋白混入膜分类」：可溶载体（硫氧还蛋白/铁蛋白/载脂蛋白/白蛋白/输入蛋白等 ~3,200 条）全部迁出膜通道类，囊泡/核质运输独立成类 13 细胞内运输，原「膜蛋白与其他」更名其他功能蛋白——每个大类名称与内容严格一致
+- 顺带修复三个潜伏 bug：porin 无边界误吸核孔蛋白、transportin 子串误吸 P型 ATPase、sec[0-9] 误吸 Sec61/Sec62 转位酶
+- 数据规模不变：88,515 蛋白 / 10 物种 / 14 大类 / 549 超家族 / 8,159 叶子家族 / classifiedPct 93.5%

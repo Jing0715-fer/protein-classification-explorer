@@ -127,8 +127,23 @@ const CLASS_RULES: { re: RegExp; code: string }[] = [
   { re: /g protein-coupled receptor|gpcr|olfactory receptor|\bopsin\b|rhodopsin-like|7tm receptor/i, code: "3" },
   // 激酶
   { re: /kinase/i, code: "2" },
-  // 转运（含 MFS 各种写法）
-  { re: /major facilitator|transporter|symporter|antiporter|permease|\bcarrier\b|porin|aquaporin|major intrinsic|atp-binding cassette|abc transporter|abc-type|solute|efflux|secretion system|translocase|\bmfs\b/i, code: "5" },
+  // 【v5 膜分类科学性修正】可溶性氧化还原电子载体/储铁辅因子（UniProt kw "Transport" 过宽会误入膜转运）
+  {
+    re: /thioredoxin|glutaredoxin|met sulfoxide reductase|electron transfer flavoprotein|etf-qo|\betf\b|fix[ab]\b|adrenodoxin|putidaredoxin|frataxin|ferritin|acyl carrier protein|cytochrome|complex i |rieske|heme-copper|ferredoxin|flavodoxin|nadh-quinone|uqcr|ferric reductase|gcvp|nifu|hesb|isc a|isochorismatase|alternative oxidase|sufbd|sulfur carrier|tusa|peroxiredoxin/i,
+    code: "1",
+  },
+  // 【v5】分泌型可溶载体（血浆脂质/维生素/铁/氧运输；apolipoprotein O/MICOS 为膜蛋白除外）
+  {
+    re: /apolipoprotein(?! o)|albumin|alpha-fetoprotein|vitamin d-binding|alb\/afp|plant ltp|plant lipid transfer|hemopexin|transferrin(?! receptor)|retinol-binding|retinaldehyde-binding|beta-2-glycoprotein|sex hormone-binding|histidine-rich|hrg family|armet/i,
+    code: "7",
+  },
+  // 转运（含 MFS 各种写法；porin 加词边界："nucleoporin" 不得命中）
+  { re: /major facilitator|transporter|symporter|antiporter|permease|\bcarrier\b|\bporins?\b|aquaporin|major intrinsic|atp-binding cassette|abc transporter|abc-type|solute|efflux|secretion system|translocase|\bmfs\b|sideroflexin|nipa/i, code: "5" },
+  // 【v5】细胞内运输机器（囊泡运输/核质运输/胞内脂质转移）——位于转运规则之后：含 transporter 的囊泡型转运体仍归 5
+  {
+    re: /syntaxin|synaptobrevin|\bsnap\b|snap-25|snapin|snare|sorting nexin|stxbp|unc-18|sec(10|13|14|15|16|23|24|31|1|2|3|5|6|8|9)\b|trapp|trappc|exocyst|exo(70|84)|clathrin|adaptor complex|adaptin|copg family|cope family|copb2|epsin|endophilin|complexin|emp24|gp25l|vesicle|vacuolar protein sorting|vps[0-9]|sortilin|endocyt|arfgap|\bimportin\b|\bexportin\b|\bkaryopherin\b|\btransportin\b|nuclear pore|nucleoporin|nup[0-9]|npip|ranbp|tom1 |stam|snf8|mvb12|fcho|stoned|necap|picalm|golph3|ergic|surf4|gosr|use1|vti1|bet1|yif1|got1|synaptotagmin|osbp|gltp|lipid transfer|star-related|stard3|tricalbin|bridge-like|sec14|sfh family|ptdins|patellin|pde6d|unc-119|tocopherol transfer|triglyceride transfer|ceramide transfer|peroxisomal targeting|get4|acbp|bloc1|hikeshi/i,
+    code: "13",
+  },
   // 小G蛋白/信号开关
   { re: /gtpase|gtp-binding|gtp-binding protein|\bras\b|\brab\b|\brho\b|\barf\b|\bran\b|\bsar\b|ga protein|calmodulin|ef-hand/i, code: "3" },
   // 细胞骨架结构
@@ -147,6 +162,13 @@ const CLASS_RULES: { re: RegExp; code: string }[] = [
   { re: /helicase|topoisomerase|polymerase|ribonucle|deoxyribonucle|nuclease|spliceosome|dead-box|rna-binding|dna-binding|recombination/i, code: "12" },
   // 核糖体与翻译
   { re: /ribosom|elongation factor|initiation factor|aminoacyl|\brrna\b/i, code: "9" },
+  // 【v5】未归类家族高置信功能路由（S-100/recoverin→钙信号；14-3-3/arrestin→信号接头；DOCK→GEF；patched/LDLR→受体）
+  { re: /s-100|recoverin|visinin|arrestin|14-3-3|semaphorin|\bdock\b|dock[0-9]|patched|brag|ldlr|low-density lipoprotein receptor/i, code: "3" },
+  { re: /aux\/iaa|lob domain|response regulator|arr family|mterf/i, code: "4" },
+  { re: /pentatricopeptide|\bppr\b/i, code: "12" },
+  { re: /annexin|fimbrial protein/i, code: "6" },
+  { re: /skp1|ankyrin socs box|\basb\b/i, code: "10" },
+  { re: /btg family/i, code: "11" },
   // 酶类（泛称兜底）
   { re: /oxidoreductase|dehydrogenase|transferase|hydrolase|lyase|isomerase|ligase|synthase|synthetase|phosphatase|peptidase|protease|oxygenase|peroxidase|catalase|mutase|cyclase|phospholipase|lipase|esterase|glycosidase|glycosyltransferase|acetyltransferase|methyltransferase|demethylase|deacetylase/i, code: "1" },
 ];
@@ -157,9 +179,9 @@ function classForChain(segs: string[], oldClass: string, hasEC: boolean): string
   for (const r of CLASS_RULES) {
     if (r.re.test(text)) return r.code;
   }
-  if (/^[1-9]$|^1[0-3]$/.test(oldClass)) return oldClass;
+  if (/^(?:[1-9]|1[0-4])$/.test(oldClass)) return oldClass;
   if (hasEC) return "1";
-  return "13";
+  return "14";
 }
 
 // ===== 3) 常见超家族/家族中文映射（保真前缀式 v4） =====
@@ -205,6 +227,37 @@ const ZH_PREFIX: [RegExp, string][] = [
   [/^cytochrome c\b/i, "细胞色素 c"],
   [/^cytochrome\b/i, "细胞色素"],
   [/^mitochondrial carrier/i, "线粒体载体"],
+  // 【v5】细胞内运输 / 可溶载体家族译名
+  [/^importin/i, "输入蛋白"],
+  [/^exportin/i, "输出蛋白"],
+  [/^karyopherin/i, "核转运蛋白"],
+  [/^transportin/i, "转运素"],
+  [/^nucleoporin/i, "核孔蛋白"],
+  [/^nuclear pore/i, "核孔复合体"],
+  [/^sorting nexin/i, "分选连接蛋白"],
+  [/^synaptotagmin/i, "突触结合蛋白"],
+  [/^synaptobrevin/i, "突触泡融蛋白"],
+  [/^clathrin/i, "网格蛋白"],
+  [/^exocyst/i, "外泌体复合体"],
+  [/^exo70/i, "外泌体复合体 EXO70"],
+  [/^exo84/i, "外泌体复合体 EXO84"],
+  [/^trapp/i, "TRAPP 复合体"],
+  [/^vesicle transport/i, "囊泡运输"],
+  [/^adaptor complex/i, "接头蛋白复合体"],
+  [/^ferritin/i, "铁蛋白"],
+  [/^glutaredoxin/i, "谷氧还蛋白"],
+  [/^apolipoprotein/i, "载脂蛋白"],
+  [/^alb\/afp\/vdb/i, "白蛋白/甲胎蛋白/VDB"],
+  [/^ppr\b/i, "PPR"],
+  [/^14-3-3/i, "14-3-3"],
+  [/^skp1/i, "SKP1"],
+  [/^plant ltp/i, "植物脂质转移蛋白"],
+  [/^osbp/i, "氧固醇结合蛋白"],
+  [/^pentatricopeptide/i, "PPR 三十五肽重复"],
+  [/^s-100/i, "S100"],
+  [/^recoverin/i, "恢复蛋白"],
+  [/^semaphorin/i, "信号素"],
+  [/^patched/i, "Patched 受体"],
   [/^sugar (transporter|porter)/i, "糖转运蛋白"],
   [/^peptide transporter/i, "肽转运蛋白"],
   [/^proton-dependent oligopeptide transporter/i, "质子依赖寡肽转运蛋白"],
@@ -740,7 +793,7 @@ async function main() {
   const classBySF = new Map<string, string>();
   let unified = 0;
   for (const [sfKey, votes] of voteBySF) {
-    let best = "13";
+    let best = "14";
     let bestN = -1;
     for (const [cls, n] of votes) {
       if (n > bestN) {
