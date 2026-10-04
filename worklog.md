@@ -47,3 +47,20 @@ Work Log:
 Stage Summary:
 - 修复的关键 bug：①SheetDescription 嵌套 <p> 导致 hydration 错误 ②SVG 属性中 hsl(var()) 无效导致进化树连线不可见（改用 currentColor+Tailwind 类）③ctx 缺失 setDetailAcc 导致详情抽屉无法关闭（TypeError 被吞掉）④PhyloView Fragment 缺 key ⑤recharts 轴颜色 var() 失效
 - lint 零错误、tsc src/ 零错误、Agent Browser 全流程验证通过（三视图交互/搜索/比较/暗色/移动端均正常，控制台零报错）
+
+---
+Task ID: 4
+Agent: Z.ai Code (main)
+Task: Agent Browser 端到端验证与 GitHub 推送
+
+Work Log:
+- Agent Browser 全流程验证：家族树点击/蛋白行→详情抽屉/直系同源导航/搜索面板(⌘K)/矩阵单元格弹窗/组名跳转比较/手动比较浮层/Escape 关闭/明暗主题/移动端 390px/粘性页脚（长页自然下推 ✓）
+- VLM 视觉审查 6 张截图（浅色树视图、进化视角、比较视图、配对明细、暗色×2、移动端）——发现并修复进化树连线不可见问题
+- tsc --noEmit 全量类型检查：src/ 零错误
+- GitHub：创建仓库 Jing0715-fer/protein-classification-explorer（公开）
+- 提交 2 个 commit：主功能 commit（106 文件）+ .env 规范化 commit（取消跟踪 .env，新增 .env.example）
+- 推送成功并验证远端文件清单；推送后清理 remote URL 中的 token
+
+Stage Summary:
+- 应用最终状态：dev server 3000 端口运行正常，页面/API 全部 200，控制台零报错零警告
+- 仓库地址：https://github.com/Jing0715-fer/protein-classification-explorer（含 db/custom.db 数据库快照，clone 后配置 .env 即可运行）
