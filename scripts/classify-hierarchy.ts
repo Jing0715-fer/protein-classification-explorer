@@ -16,6 +16,7 @@
 import type { RawProtein } from "./fetch-proteomes";
 import type { FamilyRaw } from "./fetch-families";
 import { CLASSES, FAMILIES, classify } from "./classify";
+import { SUBGROUPS, CLASS_FIXES } from "./classify-subgroups";
 
 const TAXA = [9606, 10090, 10116, 7955, 9031, 7227, 6239, 559292, 4932, 3702, 83333, 562];
 const FAM_BY_CODE = new Map(FAMILIES.map((f) => [f.code, f]));
@@ -466,7 +467,7 @@ const SLC_BRANCHES: Record<string, { nameEn: string; name: string }> = {
  */
 const SPLICE_TO_BRANCH: { re: RegExp; branch: string }[] = [
   { re: /^major facilitator( superfamily)?$/, branch: "MFS" },
-  { re: /^glycoside pentoside hexuronide gph cation symporter family$/, branch: "MFS" }, // TC 2.A.2（SLC45 所在家族）
+  { re: /^glycoside pentoside hexuronide gph cation symporter( transporter)? family$/i, branch: "MFS" }, // TC 2.A.2（SLC45 所在家族，含 transporter 变体）
   { re: /^organo anion transporter family$/, branch: "MFS" }, // SLCO/OATP（TC 2.A.60）
   { re: /^mitochondrial carrier( family)?$/, branch: "MCF" },
   { re: /^amino acid polyamine organocation apc superfamily$/, branch: "APC" },
@@ -649,7 +650,7 @@ interface TreeNode {
   children: Map<string, TreeNode>; // key = normKey(nameEn)
 }
 
-const LEVEL_LABEL = ["", "大类", "超家族", "家族", "亚家族", "细分"];
+const LEVEL_LABEL = ["", "大类", "亚类", "超家族", "家族", "亚家族", "细分"];
 
 let NID = 0;
 const nodeById = new Map<number, TreeNode>();
@@ -1233,6 +1234,152 @@ async function main() {
     fixLevels(classRoots.get(cls.code), 2);
   }
 
+  // ===== 手术 9：跨类修正 + 亚类分组（大类 → 亚类 → 超家族/家族） =====
+  // 应用户反馈：家族较多的大类按科学标准机制再分一层（如膜通道与膜转运按运输方式分组）
+  {
+    // 9a) 跨类修正：证据明确的功能错位节点迁往正确大类
+    let movedFixes = 0;
+    for (const fix of CLASS_FIXES) {
+      const fromRoot = classRoots.get(fix.from);
+      const toRoot = classRoots.get(fix.to);
+      if (!fromRoot || !toRoot) continue;
+      for (const [key, node] of [...fromRoot.entries()]) {
+        if (node.parentNid !== null) continue; // 仅大类直接子节点
+        if (node.kind === "subclass") continue;
+        if (!fix.re.test(node.nameEn)) continue;
+        fromRoot.delete(key);
+        const tKey = "fix:" + normKey(node.nameEn);
+        const existing = toRoot.get(tKey) ?? toRoot.get(normKey(node.nameEn));
+        if (existing && existing !== node) absorb(existing, node);
+        else toRoot.set(tKey, node);
+        movedFixes++;
+        console.log(`手术·跨类修正: "${node.nameEn}" 类${fix.from}→${fix.to}（${fix.why}）`);
+      }
+    }
+    console.log(`手术·跨类修正：共 ${movedFixes} 个节点`);
+
+    // 成员物种分布（类 14 按进化支归组）与成员 EC 票（类 1 残差救援）
+    const orgByNid = new Map<number, Set<number>>();
+    const ecByNid = new Map<number, string[]>();
+    for (const e of entries) {
+      if (!orgByNid.has(e.nid)) orgByNid.set(e.nid, new Set());
+      orgByNid.get(e.nid)!.add(e.p.organismId);
+      if (e.p.ecs.length > 0) {
+        if (!ecByNid.has(e.nid)) ecByNid.set(e.nid, []);
+        ecByNid.get(e.nid)!.push(...e.p.ecs);
+      }
+    }
+    const subtreeOrgs = (n: TreeNode, acc: Set<number>): Set<number> => {
+      const own = orgByNid.get(n.nid);
+      if (own) for (const o of own) acc.add(o);
+      for (const c of n.children.values()) subtreeOrgs(c, acc);
+      return acc;
+    };
+    const subtreeECs = (n: TreeNode, acc: string[]): string[] => {
+      const own = ecByNid.get(n.nid);
+      if (own) acc.push(...own);
+      for (const c of n.children.values()) subtreeECs(c, acc);
+      return acc;
+    };
+    const EC_SUBGROUP: Record<string, string> = { "1": "ox", "2": "tr", "3": "hy", "4": "ly", "5": "iz", "6": "lg", "7": "etc" };
+    const BAC = [83333, 562];
+    const FUNGI = [559292, 4932];
+    const PLANT = [3702];
+
+    // 9b) 亚类分组：每大类插入亚类层（kind=subclass）
+    const sgReport: Record<string, { nodes: number; proteins: number }[]> = {};
+    for (const cls of CLASSES) {
+      const defs = SUBGROUPS[cls.code];
+      const roots = classRoots.get(cls.code);
+      if (!defs || !roots) continue;
+      const sgNodes = new Map<string, TreeNode>();
+      for (const def of defs) {
+        const n = newNode(def.nameEn, 2, null, def.name);
+        n.kind = "subclass";
+        sgNodes.set(def.key, n);
+      }
+      // 先吸收旧引擎兜底节点（其蛋白并入亚类本体成为直接成员）
+      let absorbedFb = 0;
+      for (const [key, node] of [...roots.entries()]) {
+        if (node.kind === "subclass") continue;
+        const def = defs.find((d) => d.absorbFb?.test(node.nameEn));
+        if (!def) continue;
+        roots.delete(key);
+        absorb(sgNodes.get(def.key)!, node);
+        absorbedFb++;
+      }
+      // 其余 L2 节点按 routes 归组（先具体后泛化；末位残差）
+      const tally = defs.map(() => ({ nodes: 0, proteins: 0 }));
+      let routed = 0;
+      for (const [key, node] of [...roots.entries()]) {
+        if (node.kind === "subclass") continue;
+        let idx = defs.findIndex((d) => d.routes?.test(node.nameEn));
+        if (idx < 0) idx = defs.length - 1;
+        // 类 1 残差：成员 EC 多数票救援（名称未命中时按酶学委员会大类归组）
+        if (idx === defs.length - 1 && cls.code === "1") {
+          const ecs = subtreeECs(node, []);
+          if (ecs.length > 0) {
+            const votes = new Map<string, number>();
+            for (const ec of ecs) votes.set(ec[0], (votes.get(ec[0]) ?? 0) + 1);
+            const [best, n] = [...votes.entries()].sort((a, b) => b[1] - a[1])[0];
+            if (best && n / ecs.length >= 0.5 && EC_SUBGROUP[best]) {
+              const t = defs.findIndex((d) => d.key === EC_SUBGROUP[best]);
+              if (t >= 0) idx = t;
+            }
+          }
+        }
+        // 类 14：具名家族按成员物种进化支归组
+        if (cls.code === "14" && !defs[idx].routes && !defs[idx].absorbFb) {
+          const orgs = subtreeOrgs(node, new Set());
+          const only = (t: number[]) => orgs.size > 0 && [...orgs].every((o) => t.includes(o));
+          let target: string;
+          if (only(BAC)) target = "bac";
+          else if (only(PLANT)) target = "plant";
+          else if (only(FUNGI)) target = "fungi";
+          else target = "cons";
+          const t = defs.findIndex((d) => d.key === target);
+          if (t >= 0) idx = t;
+        }
+        const sg = sgNodes.get(defs[idx].key)!;
+        roots.delete(key);
+        node.parentNid = sg.nid;
+        sg.children.set(key, node);
+        tally[idx].nodes++;
+        tally[idx].proteins += countTree(node);
+        routed++;
+      }
+      // 大类根 → 亚类节点
+      for (const def of defs) roots.set("sg:" + def.key, sgNodes.get(def.key)!);
+      sgReport[cls.code] = tally;
+      console.log(`手术·亚类分组 类${cls.code} ${cls.name}: 吸收兜底 ${absorbedFb}，归组 ${routed} 个家族节点 → ${defs.length} 亚类`);
+    }
+    // 亚类分布报告
+    for (const cls of CLASSES) {
+      const defs = SUBGROUPS[cls.code];
+      const t = sgReport[cls.code];
+      if (!defs || !t) continue;
+      for (let i = 0; i < defs.length; i++) {
+        console.log(`   类${cls.code}·${defs[i].name}: ${t[i].nodes} 家族 / ${t[i].proteins} 蛋白`);
+      }
+    }
+    // 分组后置清理：剪空亚类 + 重算层级
+    let pruned2 = 0;
+    for (const children of classRoots.values()) pruned2 += pruneEmpty(children);
+    if (pruned2 > 0) console.log(`手术·亚类分组剪空节点 ${pruned2} 个`);
+    for (const cls of CLASSES) {
+      fixLevels(classRoots.get(cls.code), 2);
+    }
+    // 校验：每个大类的直接子节点应全部为亚类节点
+    for (const cls of CLASSES) {
+      const roots = classRoots.get(cls.code);
+      if (!roots) continue;
+      const bad = [...roots.values()].filter((n) => n.kind !== "subclass");
+      if (bad.length > 0) {
+        console.log(`   ✗ 类${cls.code} 存在未归组 L2 节点 ${bad.length} 个: ${bad.slice(0, 5).map((n) => n.nameEn).join(", ")}`);
+      }
+    }
+  }
+
   // ===== 手术 8：泛型/同名异类标签显示限定（防“同显示名”歧义） =====
   // Type 1/Class A/Plant/NIP/ATL/5-HT 等相对名或同名异类标签，附父节点限定词，
   // 使全局显示名唯一（如 "NIP subfamily · MIP/aquaporin" ≠ "NIP subfamily · RING-type zinc finger"）
@@ -1342,11 +1489,13 @@ async function main() {
     const pathSegs: string[] = [];
     let cur: TreeNode | undefined = n;
     while (cur && cur.parentNid !== null) {
-      pathSegs.unshift(cur.nameEn);
+      if (cur.kind !== "subclass") pathSegs.unshift(cur.nameEn); // 亚类为人工分组层，不计入官方链描述
       cur = nodeById.get(cur.parentNid);
     }
     const desc =
-      pathSegs.length > 1
+      n.kind === "subclass"
+        ? `大类内按科学机制/类别归组的亚类层（${n.nameEn}）`
+        : pathSegs.length > 1
         ? `UniProt 官方层级: ${pathSegs.join(" → ")}`
         : `UniProt 官方${LEVEL_LABEL[n.level] ?? "分类"}`;
     return {

@@ -42,14 +42,16 @@ function OrgStackBar({ byOrganism, active }: { byOrganism: Record<number, number
   );
 }
 
-/** 层级标记：大类实方块 / 超群菱形 / 超家族 ring 圆 / 家族小点 / 亚家族微点 */
+/** 层级标记：大类实方块 / 亚类菱形 / 超群菱形 / 超家族 ring 圆 / 家族小点 / 亚家族微点 */
 function LevelMark({
   segs,
   isGroup,
+  isSubclass,
   color,
 }: {
   segs: number;
   isGroup: boolean;
+  isSubclass: boolean;
   color: string;
 }) {
   if (segs === 1) {
@@ -59,7 +61,7 @@ function LevelMark({
       </span>
     );
   }
-  if (isGroup) {
+  if (isGroup || isSubclass) {
     return (
       <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center" aria-hidden>
         <span
@@ -106,9 +108,10 @@ export function FamilyTree({ nodes, selected, onSelect, level = 0 }: TreeProps) 
   return (
     <div className="space-y-px" role="tree" aria-label="蛋白家族分类树">
       {nodes.map((node) => {
-        const segs = node.code.split(".").length; // 1=大类 2=超家族/超群 3=家族 4=亚家族
+        const segs = node.code.split(".").length; // 1=大类 2=亚类 3=超群/超家族 4=家族 5+=亚家族
         const isClass = segs === 1;
         const isGroup = node.kind === "group";
+        const isSubclass = node.kind === "subclass";
         const color = CLASS_COLORS[node.code.split(".")[0]] ?? "#8b857a";
         const isSelected = selected === node.code;
         const isCollapsed = !expanded.has(node.code);
@@ -149,17 +152,17 @@ export function FamilyTree({ nodes, selected, onSelect, level = 0 }: TreeProps) 
                 <span className="w-4 shrink-0" />
               )}
 
-              <LevelMark segs={segs} isGroup={isGroup} color={color} />
+              <LevelMark segs={segs} isGroup={isGroup} isSubclass={isSubclass} color={color} />
 
               <span
                 className={`truncate ${
                   isClass
                     ? "font-serif text-[13.5px] font-semibold tracking-tight"
-                    : isGroup
+                    : isSubclass || isGroup
                       ? "font-serif text-[13px] font-semibold italic"
-                      : segs === 2
+                      : segs === 3
                         ? "text-[13px] font-medium"
-                        : segs >= 4
+                        : segs >= 5
                           ? "text-[12.5px] text-muted-foreground"
                           : "text-[13px]"
                 }`}
@@ -167,6 +170,11 @@ export function FamilyTree({ nodes, selected, onSelect, level = 0 }: TreeProps) 
                 {node.name}
               </span>
 
+              {isSubclass && (
+                <span className="shrink-0 border border-primary/30 bg-primary/5 px-1 py-px font-mono text-[9px] uppercase tracking-[0.12em] text-primary">
+                  亚类
+                </span>
+              )}
               {isGroup && (
                 <span className="shrink-0 border border-primary/30 bg-primary/5 px-1 py-px font-mono text-[9px] uppercase tracking-[0.12em] text-primary">
                   超群

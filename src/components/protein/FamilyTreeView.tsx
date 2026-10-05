@@ -235,7 +235,7 @@ export function FamilyTreeView({ ctx }: { ctx: ExplorerCtx }) {
       <div className="border border-border bg-card">
         <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
           <h2 className="overline-label !text-foreground">分类体系</h2>
-          <span className="font-mono text-[10px] text-muted-foreground" title="大类 → 超群/超家族 → 家族 → 亚家族（UniProt 官方层级链）">
+          <span className="font-mono text-[10px] text-muted-foreground" title="大类 → 亚类（按运输机制/功能类别分组）→ 超群/超家族 → 家族 → 亚家族（UniProt 官方层级链）">
             {data.stats.superfamilyCount.toLocaleString()} SF · {data.stats.familyCount.toLocaleString()} FAM
           </span>
         </div>

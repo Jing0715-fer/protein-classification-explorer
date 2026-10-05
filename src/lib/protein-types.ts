@@ -29,7 +29,9 @@ export interface FamilyNodeDTO {
 export interface BootstrapStats {
   totalProteins: number;
   classCount: number;
-  /** 超家族节点数（含子节点的 level-2 节点） */
+  /** 亚类数（大类内按科学机制/类别分组的人工层） */
+  subclassCount: number;
+  /** 超家族节点数（含子级的层级节点，排除大类与亚类） */
   superfamilyCount: number;
   /** 叶子家族数（树末端节点） */
   familyCount: number;

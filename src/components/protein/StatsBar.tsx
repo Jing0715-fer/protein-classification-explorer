@@ -18,7 +18,7 @@ export function StatsBar({ stats }: { stats: BootstrapStats }) {
     {
       label: "超家族",
       value: stats.superfamilyCount.toLocaleString(),
-      sub: `${stats.classCount} 大类 · 含超群层级`,
+      sub: `${stats.classCount} 大类 · ${stats.subclassCount} 亚类`,
     },
     {
       label: "家族",

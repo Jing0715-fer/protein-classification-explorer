@@ -162,18 +162,20 @@ export async function GET() {
   ]);
 
   const totalProteins = seqAgg._count._all;
-  // 层级统计：level2 含超家族+单级家族；叶子 = 家族树末端节点
+  // 层级统计：大类 → 亚类 → 超群/超家族 → 家族 → 亚家族
+  // 超家族 = 有子级的层级节点（超群/超家族/分支，排除大类与亚类）；家族 = 末端叶子节点
+  const isLeaf = (code: string) => !families.some((x) => parentOf(x.code) === code);
   const superfamilyCount = families.filter((f) => {
-    const code = f.code;
-    const segs = code.split(".").length;
-    if (segs !== 2) return false;
-    return families.some((x) => parentOf(x.code) === code);
+    const segs = f.code.split(".").length;
+    if (segs < 3) return false; // 大类/亚类不计
+    return !isLeaf(f.code);
   }).length;
   const familyCount = families.filter((f) => {
     const segs = f.code.split(".").length;
-    if (segs < 2) return false;
-    return !families.some((x) => parentOf(x.code) === f.code);
+    if (segs < 3) return false;
+    return isLeaf(f.code);
   }).length;
+  const subclassCount = families.filter((f) => f.kind === "subclass").length;
 
   const dto: BootstrapDTO = {
     organisms: orgDTOs,
@@ -181,6 +183,7 @@ export async function GET() {
     stats: {
       totalProteins,
       classCount: roots.length,
+      subclassCount,
       superfamilyCount,
       familyCount,
       organismCount: orgDTOs.length,
